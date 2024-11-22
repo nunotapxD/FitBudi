@@ -4,20 +4,22 @@ import 'login_selection_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  try {
+    await Firebase.initializeApp();
+    debugPrint('Firebase inicializado');
+  } catch (e) {
+    debugPrint('Erro ao inicializar Firebase: $e');
+  }
   runApp(MyApp());
 }
+
 
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'FitBudi',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
-      home: LoginSelectionPage(),  // A página inicial será a LoginSelectionPage
+      home: LoginSelectionPage(),
     );
   }
 }

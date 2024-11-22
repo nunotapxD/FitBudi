@@ -4,6 +4,7 @@ allprojects {
         mavenCentral()
     }
 }
+classpath 'com.google.gms:google-services:4.3.10' // Verifique se a versão está atualizada
 
 rootProject.buildDir = "../build"
 subprojects {
