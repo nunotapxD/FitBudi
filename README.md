@@ -10,9 +10,6 @@ Bem-vindo ao **FitBudi**, a aplicação ideal para personal trainers e clientes 
    - [Modo Cliente](#-modo-cliente)  
    - [Modo Admin (Personal Trainer)](#-modo-admin-personal-trainer)  
 3. [Tecnologias Utilizadas](#-tecnologias-utilizadas)  
-4. [Como Rodar o Projeto](#-como-rodar-o-projeto)  
-5. [Contribuição](#️-contribuição)  
-6. [Licença](#-licença)  
 
 ---
 
