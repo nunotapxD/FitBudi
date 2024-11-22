@@ -1,6 +1,6 @@
 # 🎯 **FitBudi - Sua Jornada Fitness Digital**
 
-Bem-vindo ao **FitBudi**, a aplicação ideal para personal trainers e clientes gerenciarem suas rotinas de treino, nutrição e progresso. 🚀
+Bem-vindo ao **FitBudi**, a aplicação ideal para personal trainers e clientes gerirem as suas rotinas de treino, nutrição e progresso. 🚀
 
 ---
 
