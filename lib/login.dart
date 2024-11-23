@@ -1,9 +1,13 @@
-import 'client_register_page.dart'; // Import ClientRegisterPage
+import 'login_register.dart'; // Import ClientRegisterPage
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:flutter/material.dart';
-import 'client_dashboard_page.dart';  // Assuming you have a ClientDashboardPage
+import 'client_dashboard_page.dart'; // Import ClientDashboardPage
+import 'admin_dashboard.dart'; // Import AdminDashboardPage
 
 class LoginSelectionPage extends StatefulWidget {
+  const LoginSelectionPage({super.key});
+
   @override
   _LoginSelectionPageState createState() => _LoginSelectionPageState();
 }
@@ -86,18 +90,6 @@ class _LoginSelectionPageState extends State<LoginSelectionPage> {
                     style: TextStyle(color: Colors.deepPurple),
                   ),
                 ),
-                const SizedBox(height: 16),
-                // Space PT link (Admin dashboard)
-                TextButton(
-                  onPressed: () {
-                    debugPrint('Navigating to Space PT (Admin Dashboard)');
-                    // Replace this with actual navigation for the admin dashboard
-                  },
-                  child: const Text(
-                    'Space PT',
-                    style: TextStyle(color: Colors.deepPurple),
-                  ),
-                ),
               ],
             ),
           ),
@@ -113,7 +105,7 @@ class _LoginSelectionPageState extends State<LoginSelectionPage> {
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Por favor, insira e-mail e senha válidos')),
+        const SnackBar(content: Text('Por favor, insira e-mail e senha válidos')),
       );
       return;
     }
@@ -127,19 +119,50 @@ class _LoginSelectionPageState extends State<LoginSelectionPage> {
       UserCredential userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
 
-      // If successful, navigate to the client dashboard
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => ClientDashboardPage()),
-      );
+      // Get the user's role from Firestore
+      final userId = userCredential.user?.uid;
+      if (userId == null) throw FirebaseAuthException(code: "user-not-found");
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (!userDoc.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Usuário não encontrado no banco de dados')),
+        );
+        return;
+      }
+
+      final userData = userDoc.data();
+      final role = userData?['role'] ?? 'client'; // Default role is 'client'
+
+      // Navigate based on role
+      if (role == 'admin') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => AdminDashboardPage()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => ClientDashboardPage()),
+        );
+      }
     } on FirebaseAuthException catch (e) {
       // Handle Firebase authentication errors
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erro ao fazer login: ${e.message}')),
       );
+    } catch (e) {
+      // Handle other errors
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro inesperado: $e')),
+      );
     } finally {
       setState(() {
-        _isLoading = false;
+        _isLoading = false; // Properly close the `setState` block
       });
     }
   }

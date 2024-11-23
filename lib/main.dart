@@ -1,27 +1,24 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'login_selection_page.dart';
+import 'package:firebase_core/firebase_core.dart'; // Import Firebase Core
+import 'firebase_options.dart'; // Import Firebase options
 
-// Add the FirebaseOptions for web initialization
-const FirebaseOptions firebaseOptions = FirebaseOptions(
-  apiKey: "AIzaSyARTGJEQOoeMH8dyDPJ6dBg6LqzICKdC6Y",  // Replace with your actual API key
-  authDomain: "fitbudi-4c6da.firebaseapp.com",  // Replace with your actual authDomain
-  projectId: "fitbudi-4c6da",  // Replace with your actual projectId
-  storageBucket: "fitbudi-4c6da.firebasestorage.app",  // Replace with your actual storageBucket
-  messagingSenderId: "1094621998423",  // Replace with your actual messagingSenderId
-  appId: "1:1094621998423:web:1c2d49459341583cf9e212",  // Replace with your actual appId
-  measurementId: "G-KMZYMH8JKF",  // Replace with your actual measurementId
-);
+import 'login.dart'; // Import the login selection page
+import 'client_dashboard_page.dart'; // Import the client dashboard page
+import 'admin_dashboard.dart'; // Import the admin dashboard page
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized(); // Ensure Flutter binding is initialized
 
-  // Initialize Firebase and check if successful
-  await Firebase.initializeApp(options: firebaseOptions).catchError((e) {
-    debugPrint('Error initializing Firebase: $e');
-  });
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform, // Use platform-specific options
+    );
+    print('Firebase initialized successfully');
+  } catch (e) {
+    print('Error initializing Firebase: $e'); // Print errors if initialization fails
+  }
 
-  runApp(MyApp());
+  runApp(MyApp()); // Run the app
 }
 
 class MyApp extends StatelessWidget {
@@ -29,35 +26,12 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'FitBudi',
-      // Use FutureBuilder to handle Firebase initialization status
-      home: FutureBuilder(
-        future: Firebase.initializeApp(options: firebaseOptions),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            if (snapshot.hasError) {
-              return Scaffold(
-                body: Center(
-                  child: Text(
-                    'Erro ao iniciar o Firebase, tente novamente mais tarde',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 18, color: Colors.red),
-                  ),
-                ),
-              );
-            }
-            return LoginSelectionPage(); // Firebase initialized successfully, show LoginSelectionPage
-          }
-          // While Firebase is initializing, show a loading spinner
-          return Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
-          );
-        },
-      ),
+      initialRoute: '/login', // Set the initial route to the login page
       routes: {
-        '/loginSelection': (context) => LoginSelectionPage(),
-        // Define any other routes like '/clientDashboard', '/clientRegister' as necessary
+        '/login': (context) => LoginSelectionPage(),
+        '/dashboard': (context) => ClientDashboardPage(),
+        '/adminDashboard': (context) => AdminDashboardPage(), // Add admin dashboard route
+        // Add more routes as needed
       },
     );
   }
