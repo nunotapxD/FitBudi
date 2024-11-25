@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
+import 'AdminMealPage.dart';
 
 class AdminDashboardPage extends StatefulWidget {
+  const AdminDashboardPage({super.key});
+
   @override
   _AdminDashboardPageState createState() => _AdminDashboardPageState();
 }
@@ -11,12 +15,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  String? userName; // To store the authenticated user's name
-  List<Map<String, dynamic>> users = []; // To store other users' data
-  List<Map<String, dynamic>> deletedUsers = []; // To store deleted users
-  String? selectedUserId; // To store the selected user's UID
-  bool showDeletedUsers = false; // To track whether deleted users are being shown
-  List<Map<String, dynamic>> calendarEvents = []; // To store calendar events
+  String? userName;
+  List<Map<String, dynamic>> users = [];
+  List<Map<String, dynamic>> deletedUsers = [];
+  String? selectedUserId;
+  bool showDeletedUsers = false;
+  bool showMeals = false;
 
   @override
   void initState() {
@@ -25,206 +29,309 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     _fetchUsers();
   }
 
-  // Fetch data for the authenticated user
   Future<void> _fetchUserData() async {
     User? user = _auth.currentUser;
     if (user != null) {
       DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (mounted) {
+        setState(() {
+          userName = (userDoc.data() as Map<String, dynamic>)['name'] as String?;
+          selectedUserId = user.uid;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchUsers() async {
+    QuerySnapshot querySnapshot = await _firestore
+        .collection('users')
+        .where('deleted', isNotEqualTo: 1)
+        .get();
+        
+    if (mounted) {
       setState(() {
-        userName = userDoc['name']; // Get the name of the authenticated user
-        selectedUserId = user.uid; // Set the authenticated user's ID as selected by default
+        users = querySnapshot.docs
+            .map((doc) => {
+                  ...doc.data() as Map<String, dynamic>,
+                  'uid': doc.id,
+                })
+            .where((user) => user['uid'] != _auth.currentUser?.uid)
+            .toList();
       });
     }
   }
 
-  // Fetch all users (excluding the current authenticated user)
-  Future<void> _fetchUsers() async {
-    QuerySnapshot querySnapshot = await _firestore.collection('users').get();
-    setState(() {
-      users = querySnapshot.docs
-          .map((doc) => doc.data() as Map<String, dynamic>)
-          .where((user) => user['uid'] != _auth.currentUser?.uid && user['deleted'] != 1) // Exclude the authenticated user and deleted users
-          .toList();
-    });
-  }
-
-  // Fetch deleted users (users with 'deleted' field set to 1)
   Future<void> _fetchDeletedUsers() async {
-    QuerySnapshot querySnapshot = await _firestore.collection('users').where('deleted', isEqualTo: 1).get();
-    setState(() {
-      deletedUsers = querySnapshot.docs
-          .map((doc) => doc.data() as Map<String, dynamic>)
-          .toList();
-      showDeletedUsers = true; // Set to true when showing deleted users
-    });
-  }
-
-  // Fetch calendar events for all users
-  Future<void> _fetchCalendarEvents() async {
-    // Fetch the calendar subcollections for all users
-    List<Map<String, dynamic>> events = [];
-    for (var user in users) {
-      var userId = user['uid'];
-      QuerySnapshot calendarSnapshot = await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('calendar')
-          .get();
-
-      events.addAll(calendarSnapshot.docs
-          .map((doc) => doc.data() as Map<String, dynamic>)
-          .toList());
+    QuerySnapshot querySnapshot = await _firestore
+        .collection('users')
+        .where('deleted', isEqualTo: 1)
+        .get();
+        
+    if (mounted) {
+      setState(() {
+        deletedUsers = querySnapshot.docs
+            .map((doc) => {
+                  ...doc.data() as Map<String, dynamic>,
+                  'uid': doc.id,
+                })
+            .toList();
+        showDeletedUsers = true;
+      });
     }
-
-    setState(() {
-      calendarEvents = events; // Store the fetched calendar events
-    });
   }
 
-  // Mark a user as deleted (soft delete)
   Future<void> _deleteUser(String userId) async {
-    if (_auth.currentUser?.uid != userId) { // Prevent deletion of the authenticated user
+    if (_auth.currentUser?.uid != userId) {
       await _firestore.collection('users').doc(userId).update({'deleted': 1});
-      _fetchUsers(); // Refresh the user list
+      await _fetchUsers();
     }
   }
 
-  // Restore a deleted user
   Future<void> _restoreUser(String userId) async {
     await _firestore.collection('users').doc(userId).update({'deleted': 0});
-    _fetchDeletedUsers(); // Refresh the deleted users list
-    _fetchUsers(); // Refresh the user list
+    await _fetchDeletedUsers();
+    await _fetchUsers();
+    if (mounted) {
+      setState(() {
+        showDeletedUsers = false;
+      });
+    }
   }
 
-  // Update the selected user's UID and trigger calendar update
-  void _onUserTap(String userId) {
-    setState(() {
-      selectedUserId = userId; // Set the selected user's UID
-      showDeletedUsers = false; // Reset deleted users view
-    });
+  void _showAddMealDialog(String userId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AdminMealPage(userId: userId),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Admin Dashboard'),
+        title: const Text('Admin Dashboard'),
       ),
       body: Row(
         children: [
-          // Left Sidebar
+          // Sidebar Esquerda
           Expanded(
             flex: 1,
             child: Container(
               color: Colors.grey[200],
               child: Column(
                 children: [
-                  // Display authenticated user's name at the top
-                  ListTile(
-                    title: Text(userName ?? 'Loading...'), // Display authenticated user's name
-                    subtitle: Text('Authenticated User'),
-                    tileColor: Colors.blue[100],
-                    onTap: () {
-                      _onUserTap(_auth.currentUser!.uid); // Set the authenticated user as selected
-                    },
-                  ),
-                  Divider(),
-                  // Display other users below the authenticated user
-                  ...users.map((user) {
-                    return ListTile(
-                      title: Text(user['name']), // Display the name of the other users
-                      subtitle: Text(user['email'] ?? 'No email'),
-                      trailing: IconButton(
-                        icon: Icon(Icons.delete),
-                        onPressed: () => _deleteUser(user['uid']),
-                      ),
+                  if (userName != null) // Só mostra se o userName foi carregado
+                    ListTile(
+                      title: Text(userName!),
+                      subtitle: const Text('Admin'),
+                      tileColor: Colors.blue[100],
                       onTap: () {
-                        _onUserTap(user['uid']); // Update selected user when clicked
+                        setState(() {
+                          selectedUserId = _auth.currentUser!.uid;
+                          showDeletedUsers = false;
+                          showMeals = false;
+                        });
                       },
-                    );
-                  }).toList(),
-                  Spacer(),
-                  // Deleted Users Button
-                  ElevatedButton(
-                    onPressed: () {
-                      _fetchDeletedUsers();
-                    },
-                    child: Text('Show Deleted Users'),
+                    ),
+                  const Divider(),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: users.length,
+                      itemBuilder: (context, index) {
+                        final user = users[index];
+                        return ExpansionTile(
+                          title: Text(user['name'] ?? 'Sem nome'),
+                          subtitle: Text(user['email'] ?? 'Sem email'),
+                          children: [
+                            ListTile(
+                              leading: const Icon(Icons.restaurant_menu),
+                              title: const Text('Gerenciar Refeições'),
+                              onTap: () {
+                                setState(() {
+                                  selectedUserId = user['uid'];
+                                  showDeletedUsers = false;
+                                  showMeals = true;
+                                });
+                              },
+                            ),
+                            ListTile(
+                              leading: const Icon(Icons.calendar_today),
+                              title: const Text('Ver Calendário'),
+                              onTap: () {
+                                setState(() {
+                                  selectedUserId = user['uid'];
+                                  showDeletedUsers = false;
+                                  showMeals = false;
+                                });
+                              },
+                            ),
+                            ListTile(
+                              leading: const Icon(Icons.delete),
+                              title: const Text('Deletar Usuário'),
+                              onTap: () => _deleteUser(user['uid']),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  const Divider(),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: ElevatedButton.icon(
+                      onPressed: _fetchDeletedUsers,
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Usuários Deletados'),
+                    ),
                   ),
                 ],
               ),
             ),
           ),
-          // Right Section (Calendar or Deleted Users List)
+          // Seção Direita
           Expanded(
             flex: 2,
             child: Container(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  // Only display the title when not showing deleted users
-                  if (!showDeletedUsers) ...[
-                    Text('Calendar of Events', style: TextStyle(fontSize: 20)),
-                    ElevatedButton(
-                      onPressed: _fetchCalendarEvents, // Fetch all calendar events for users
-                      child: Text('Fetch All Calendar Events'),
-                    ),
-                  ],
-                  Expanded(
-                    child: showDeletedUsers
-                        ? ListView.builder(
-                            itemCount: deletedUsers.length,
-                            itemBuilder: (context, index) {
-                              final user = deletedUsers[index];
-                              return ListTile(
-                                title: Text(user['name']),
-                                subtitle: Text(user['email'] ?? 'No email'),
-                                trailing: IconButton(
-                                  icon: Icon(Icons.restore),
-                                  onPressed: () => _restoreUser(user['uid']),
-                                ),
-                              );
-                            },
-                          )
-                        : selectedUserId == null
-                            ? Center(child: Text('Please select a user'))
-                            : UserCalendarWidget(userId: selectedUserId!), // Show calendar for the selected user
-                  ),
-                  // Display calendar events as a list
-                  if (calendarEvents.isNotEmpty) ...[
-                    Text('All Calendar Events:', style: TextStyle(fontSize: 18)),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: calendarEvents.length,
-                        itemBuilder: (context, index) {
-                          final event = calendarEvents[index];
-                          return ListTile(
-                            title: Text(event['type'] ?? 'Event'),
-                            subtitle: Text(
-                                'Start: ${event['startDate']} - End: ${event['endDate']}'),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+              padding: const EdgeInsets.all(16),
+              child: showDeletedUsers
+                  ? _buildDeletedUsersList()
+                  : showMeals
+                      ? _buildMealManagement()
+                      : selectedUserId == null
+                          ? const Center(child: Text('Selecione um usuário'))
+                          : UserCalendarWidget(userId: selectedUserId!),
             ),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildDeletedUsersList() {
+    return ListView.builder(
+      itemCount: deletedUsers.length,
+      itemBuilder: (context, index) {
+        final user = deletedUsers[index];
+        return Card(
+          child: ListTile(
+            title: Text(user['name'] ?? 'Sem nome'),
+            subtitle: Text(user['email'] ?? 'Sem email'),
+            trailing: IconButton(
+              icon: const Icon(Icons.restore),
+              onPressed: () => _restoreUser(user['uid']),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMealManagement() {
+    if (selectedUserId == null) {
+      return const Center(child: Text('Selecione um usuário'));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Gerenciamento de Refeições',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('Adicionar Refeição'),
+              onPressed: () => _showAddMealDialog(selectedUserId!),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: _firestore
+                .collection('users')
+                .doc(selectedUserId)
+                .collection('meals')
+                .orderBy('date')
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(child: Text('Erro: ${snapshot.error}'));
+              }
+
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final meals = snapshot.data?.docs ?? [];
+
+              if (meals.isEmpty) {
+                return const Center(
+                  child: Text('Nenhuma refeição cadastrada'),
+                );
+              }
+
+              return ListView.builder(
+                itemCount: meals.length,
+                itemBuilder: (context, index) {
+                  final meal = meals[index].data() as Map<String, dynamic>;
+                  return Card(
+                    child: ListTile(
+                      title: Text(meal['mealName'] ?? ''),
+                      subtitle: Text(
+                        '${meal['mealType']} - ${meal['time']}\n'
+                        'Calorias: ${meal['calories']} kcal | '
+                        'P: ${meal['protein']}g | '
+                        'C: ${meal['carbs']}g | '
+                        'G: ${meal['fats']}g',
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () {
+                              // TODO: Implementar edição
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete),
+                            onPressed: () async {
+                              await _firestore
+                                  .collection('users')
+                                  .doc(selectedUserId)
+                                  .collection('meals')
+                                  .doc(meals[index].id)
+                                  .delete();
+                            },
+                          ),
+                        ],
+                      ),
+                      isThreeLine: true,
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-// Calendar Widget for the selected user
 class UserCalendarWidget extends StatelessWidget {
   final String userId;
 
-  UserCalendarWidget({required this.userId});
+  const UserCalendarWidget({super.key, required this.userId});
 
   @override
   Widget build(BuildContext context) {
-    return Center(child: Text('Calendar events for user ID $userId')); // Placeholder for user-specific calendar
+    return Center(child: Text('Calendário do usuário: $userId'));
   }
 }

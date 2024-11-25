@@ -59,63 +59,16 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-Widget _buildMessage(Map<String, dynamic> message, bool isMe) {
+  Widget _buildMessage(Map<String, dynamic> message, bool isMe) {
     final timestamp = message['timestamp'] as Timestamp?;
     final time = timestamp != null 
         ? DateFormat('HH:mm').format(timestamp.toDate())
         : '';
 
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
-        child: Card(
-          color: isMe ? Colors.green[400] : Colors.deepPurple,
-          margin: EdgeInsets.only(
-            bottom: 8,
-            left: isMe ? 50 : 8,
-            right: isMe ? 8 : 50,
-          ),
-          elevation: 1,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(12),
-              topRight: const Radius.circular(12),
-              bottomLeft: Radius.circular(isMe ? 12 : 0),
-              bottomRight: Radius.circular(isMe ? 0 : 12),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 8,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  message['text'] ?? '',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  time,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return MessageBubble(
+      message: message['text'] ?? '',
+      isSent: isMe,
+      time: time,
     );
   }
 
@@ -123,30 +76,58 @@ Widget _buildMessage(Map<String, dynamic> message, bool isMe) {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        centerTitle: true,
-        title: Column(
+        backgroundColor: const Color(0xFF1E1E1E), // Cor de fundo escura
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.phone, color: Colors.white),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onPressed: () {},
+          ),
+        ],
+        title: Row(
           children: [
-            Text(
-              widget.otherUserName,
-              style: const TextStyle(fontSize: 18),
-            ),
-            const Text(
-              'Online',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.green,
-                fontWeight: FontWeight.normal,
+            CircleAvatar(
+              backgroundColor: Theme.of(context).primaryColor,
+              child: Text(
+                widget.otherUserName[0].toUpperCase(),
+                style: const TextStyle(color: Colors.white),
               ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.otherUserName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.normal,
+                  ),
+                ),
+                const Text(
+                  'Online',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-        elevation: 1,
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: Container(
-              color: Colors.grey[50],
+      body: Container(
+        color: const Color(0xFF1E1E1E), // Cor de fundo escura
+        child: Column(
+          children: [
+            Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: _getMessages(),
                 builder: (context, snapshot) {
@@ -174,8 +155,49 @@ Widget _buildMessage(Map<String, dynamic> message, bool isMe) {
                 },
               ),
             ),
-          ),
-        ],
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.mic,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        hintText: 'Digite sua mensagem',
+                        hintStyle: TextStyle(color: Colors.grey),
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () {},
+                    icon: const Icon(
+                      Icons.emoji_emotions,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _sendMessage,
+                    icon: const Icon(
+                      Icons.send,
+                      color: Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -195,5 +217,57 @@ Widget _buildMessage(Map<String, dynamic> message, bool isMe) {
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+}
+
+class MessageBubble extends StatelessWidget {
+  final String message;
+  final bool isSent;
+  final String time;
+
+  const MessageBubble({
+    Key? key,
+    required this.message,
+    required this.isSent,
+    required this.time,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: isSent ? Alignment.bottomRight : Alignment.bottomLeft,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: isSent ? Colors.white : const Color(0xFF2C6BED), // Azul para recebidas, branco para enviadas
+          borderRadius: BorderRadius.only(
+            topLeft: isSent ? const Radius.circular(16) : const Radius.circular(0),
+            topRight: isSent ? const Radius.circular(0) : const Radius.circular(16),
+            bottomLeft: const Radius.circular(16),
+            bottomRight: const Radius.circular(16),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: isSent ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Text(
+              message,
+              style: TextStyle(
+                color: isSent ? Colors.black : Colors.white,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              time,
+              style: TextStyle(
+                color: isSent ? Colors.black54 : Colors.white70,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
