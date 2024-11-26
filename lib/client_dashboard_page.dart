@@ -116,7 +116,7 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                   _buildDashboardItem(
                     context,
                     'Perfil',
-                    Icons.chat,
+                    Icons.person_off_outlined,
                     Colors.yellow,
                     () {
                       Navigator.of(context).pushNamed('/profile');
@@ -125,7 +125,7 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                   _buildDashboardItem(
                     context,
                     'Settings',
-                    Icons.chat,
+                    Icons.settings,
                     const Color.fromARGB(255, 112, 112, 112),
                     () {
                       Navigator.of(context).pushNamed('/settings');
