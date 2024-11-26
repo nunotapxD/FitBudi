@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'client_dashboard_page.dart';
 import 'calendar_page.dart';
-import 'meals_page.dart';
 import 'videos_page.dart';
 import 'chat/chat_page.dart';
 import 'settings_page.dart';
