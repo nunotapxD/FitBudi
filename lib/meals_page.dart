@@ -1,4 +1,4 @@
-// lib/screens/meals/meals_page.dart
+// lib/pages/meals_page.dart
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
+import 'AdminMealPage.dart';
 
 class MealPlan {
   final String id;
@@ -42,8 +43,8 @@ class MealPlan {
       time: data['time'] ?? '',
       calories: (data['calories'] ?? 0).toInt(),
       protein: (data['protein'] ?? 0).toDouble(),
-      carbs: (data['carbs'] ?? 0).toDouble(),
-      fats: (data['fats'] ?? 0).toDouble(),
+      carbs: data['carbs'] ?? 0.0,
+      fats: data['fats'] ?? 0.0,
       ingredients: List<String>.from(data['ingredients'] ?? []),
       date: data['date'] ?? '',
     );
@@ -51,7 +52,14 @@ class MealPlan {
 }
 
 class MealsPage extends StatefulWidget {
-  const MealsPage({super.key});
+  final String? userId;
+  final bool isAdmin;
+  
+  const MealsPage({
+    super.key, 
+    this.userId,
+    this.isAdmin = false,
+  });
 
   @override
   State<MealsPage> createState() => _MealsPageState();
@@ -63,11 +71,26 @@ class _MealsPageState extends State<MealsPage> {
   final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
   DateTime _selectedDate = DateTime.now();
   bool _notificationsEnabled = false;
+  String? _userName;
 
   @override
   void initState() {
     super.initState();
     _initializeNotifications();
+    if (widget.isAdmin && widget.userId != null) {
+      _loadUserName();
+    }
+  }
+
+  Future<void> _loadUserName() async {
+    if (widget.userId != null) {
+      final userDoc = await _firestore.collection('users').doc(widget.userId).get();
+      if (userDoc.exists && mounted) {
+        setState(() {
+          _userName = (userDoc.data() as Map<String, dynamic>)['name'] as String?;
+        });
+      }
+    }
   }
 
   Future<void> _initializeNotifications() async {
@@ -92,64 +115,69 @@ class _MealsPageState extends State<MealsPage> {
       },
     );
 
-    if (Theme.of(context).platform == TargetPlatform.iOS) {
-      final bool? result = await _notificationsPlugin
-          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
-          ?.requestPermissions(
-            alert: true,
-            badge: true,
-            sound: true,
-          );
-      setState(() {
-        _notificationsEnabled = result ?? false;
-      });
-    } else {
-      setState(() {
-        _notificationsEnabled = true;
-      });
+    if (mounted) {
+      if (Theme.of(context).platform == TargetPlatform.iOS) {
+        final bool? result = await _notificationsPlugin
+            .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+            ?.requestPermissions(
+              alert: true,
+              badge: true,
+              sound: true,
+            );
+        setState(() {
+          _notificationsEnabled = result ?? false;
+        });
+      } else {
+        setState(() {
+          _notificationsEnabled = true;
+        });
+      }
     }
   }
 
   Future<void> _scheduleNotification(MealPlan meal) async {
     if (!_notificationsEnabled) return;
 
-    final timeparts = meal.time.split(':');
-    final hour = int.parse(timeparts[0]);
-    final minute = int.parse(timeparts[1].split(' ')[0]);
-    final isPM = meal.time.toLowerCase().contains('pm');
+    try {
+      final timeparts = meal.time.split(':');
+      final hour = int.parse(timeparts[0]);
+      final minute = int.parse(timeparts[1]);
 
-    final scheduledTime = DateTime(
-      _selectedDate.year,
-      _selectedDate.month,
-      _selectedDate.day,
-      isPM ? hour + 12 : hour,
-      minute,
-    );
+      final scheduledTime = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        hour,
+        minute,
+      );
 
-    if (scheduledTime.isBefore(DateTime.now())) return;
+      if (scheduledTime.isBefore(DateTime.now())) return;
 
-    await _notificationsPlugin.zonedSchedule(
-      meal.id.hashCode,
-      'Hora da Refeição',
-      'Está na hora do seu ${meal.mealType}',
-      tz.TZDateTime.from(scheduledTime, tz.local),
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'meals_channel',
-          'Meals Notifications',
-          importance: Importance.high,
-          priority: Priority.high,
+      await _notificationsPlugin.zonedSchedule(
+        meal.id.hashCode,
+        'Hora da Refeição',
+        'Está na hora do seu ${meal.mealType}',
+        tz.TZDateTime.from(scheduledTime, tz.local),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'meals_channel',
+            'Meals Notifications',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
         ),
-        iOS: DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    } catch (e) {
+      debugPrint('Erro ao agendar notificação: $e');
+    }
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -180,41 +208,43 @@ class _MealsPageState extends State<MealsPage> {
   @override
   Widget build(BuildContext context) {
     final String currentDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final String currentUserId = widget.isAdmin ? widget.userId! : _auth.currentUser?.uid ?? '';
 
     return Scaffold(
       backgroundColor: const Color(0xFF1E1E1E),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Plano Alimentar'),
+        title: Text(_userName != null ? 'Plano Alimentar - $_userName' : 'Plano Alimentar'),
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_today),
             onPressed: () => _selectDate(context),
           ),
-          IconButton(
-            icon: Icon(
-              _notificationsEnabled
-                  ? Icons.notifications_active
-                  : Icons.notifications_off,
-              color: _notificationsEnabled ? Colors.yellow : Colors.grey,
+          if (!widget.isAdmin)
+            IconButton(
+              icon: Icon(
+                _notificationsEnabled
+                    ? Icons.notifications_active
+                    : Icons.notifications_off,
+                color: _notificationsEnabled ? Colors.yellow : Colors.grey,
+              ),
+              onPressed: () async {
+                if (_notificationsEnabled) {
+                  await _notificationsPlugin.cancelAll();
+                  setState(() {
+                    _notificationsEnabled = false;
+                  });
+                } else {
+                  await _initializeNotifications();
+                }
+              },
             ),
-            onPressed: () async {
-              if (_notificationsEnabled) {
-                await _notificationsPlugin.cancelAll();
-                setState(() {
-                  _notificationsEnabled = false;
-                });
-              } else {
-                await _initializeNotifications();
-              }
-            },
-          ),
         ],
       ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: _firestore
             .collection('users')
-            .doc(_auth.currentUser?.uid)
+            .doc(currentUserId)
             .snapshots(),
         builder: (context, userSnapshot) {
           if (userSnapshot.hasError) {
@@ -232,7 +262,7 @@ class _MealsPageState extends State<MealsPage> {
           return StreamBuilder<QuerySnapshot>(
             stream: _firestore
                 .collection('users')
-                .doc(_auth.currentUser?.uid)
+                .doc(currentUserId)
                 .collection('meals')
                 .where('date', isEqualTo: currentDate)
                 .orderBy('time')
@@ -250,6 +280,12 @@ class _MealsPageState extends State<MealsPage> {
                   .map((doc) => MealPlan.fromFirestore(doc))
                   .toList() ??
                   [];
+
+              if (!widget.isAdmin && _notificationsEnabled) {
+                for (var meal in meals) {
+                  _scheduleNotification(meal);
+                }
+              }
 
               final macroTotals = _calculateMacroTotals(meals);
 
@@ -269,13 +305,23 @@ class _MealsPageState extends State<MealsPage> {
                   const SizedBox(height: 20),
                   _buildMacrosSummary(macroTotals, goals),
                   const SizedBox(height: 20),
-                  const Text(
-                    'Refeições do Dia',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Refeições do Dia',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (widget.isAdmin)
+                        IconButton(
+                          icon: const Icon(Icons.add, color: Colors.white),
+                          onPressed: () => _addMeal(context),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   if (meals.isEmpty)
@@ -296,8 +342,7 @@ class _MealsPageState extends State<MealsPage> {
     );
   }
 
-  Widget _buildMacrosSummary(
-      Map<String, double> totals, Map<String, dynamic> goals) {
+  Widget _buildMacrosSummary(Map<String, double> totals, Map<String, dynamic> goals) {
     return Card(
       color: const Color(0xFF2C2C2C),
       child: Padding(
@@ -392,9 +437,24 @@ class _MealsPageState extends State<MealsPage> {
           meal.time,
           style: const TextStyle(color: Colors.grey),
         ),
-        trailing: Text(
-          '${meal.calories} kcal',
-          style: const TextStyle(color: Colors.orange),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${meal.calories} kcal',
+              style: const TextStyle(color: Colors.orange),
+            ),
+            if (widget.isAdmin) ...[
+              IconButton(
+                icon: const Icon(Icons.edit, color: Colors.blue),
+                onPressed: () => _editMeal(meal),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () => _showDeleteConfirmDialog(meal),
+              ),
+            ],
+          ],
         ),
         children: [
           Padding(
@@ -415,29 +475,31 @@ class _MealsPageState extends State<MealsPage> {
                   'P: ${meal.protein}g | C: ${meal.carbs}g | G: ${meal.fats}g',
                   style: const TextStyle(color: Colors.grey),
                 ),
-                const Divider(color: Colors.grey),
-                const Text(
-                  'Ingredientes:',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                if (meal.ingredients.isNotEmpty) ...[
+const Divider(color: Colors.grey),
+                  const Text(
+                    'Ingredientes:',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                ...meal.ingredients.map((ingredient) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.fiber_manual_record,
-                              size: 8, color: Colors.white),
-                          const SizedBox(width: 8),
-                          Text(
-                            ingredient,
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    )),
+                  const SizedBox(height: 4),
+                  ...meal.ingredients.map((ingredient) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.fiber_manual_record,
+                            size: 8, color: Colors.white),
+                        const SizedBox(width: 8),
+                        Text(
+                          ingredient,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  )),
+                ],
               ],
             ),
           ),
@@ -446,7 +508,7 @@ class _MealsPageState extends State<MealsPage> {
     );
   }
 
-Map<String, double> _calculateMacroTotals(List<MealPlan> meals) {
+  Map<String, double> _calculateMacroTotals(List<MealPlan> meals) {
     return meals.fold({
       'calories': 0.0,
       'protein': 0.0,
@@ -459,5 +521,99 @@ Map<String, double> _calculateMacroTotals(List<MealPlan> meals) {
       totals['fats'] = (totals['fats'] ?? 0) + meal.fats;
       return totals;
     });
+  }
+
+  void _addMeal(BuildContext context) {
+    if (!widget.isAdmin || widget.userId == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AdminMealPage(
+          userId: widget.userId!,
+        ),
+      ),
+    );
+  }
+
+  void _editMeal(MealPlan meal) {
+    if (!widget.isAdmin || widget.userId == null) return;
+
+    // TODO: Implementar edição de refeição
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Funcionalidade de edição em desenvolvimento'),
+        backgroundColor: Colors.orange,
+      ),
+    );
+  }
+
+  void _showDeleteConfirmDialog(MealPlan meal) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2C2C2C),
+        title: const Text(
+          'Confirmar Exclusão',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Deseja realmente excluir esta refeição?',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                final String userId = widget.isAdmin ? widget.userId! : _auth.currentUser!.uid;
+                await _firestore
+                    .collection('users')
+                    .doc(userId)
+                    .collection('meals')
+                    .doc(meal.id)
+                    .delete();
+
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Refeição excluída com sucesso'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erro ao excluir refeição: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text(
+              'Excluir',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _notificationsPlugin.cancelAll();
+    super.dispose();
   }
 }
