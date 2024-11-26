@@ -53,6 +53,7 @@ class _ClientRegisterPageState extends State<ClientRegisterPage> {
           'role': 'normal',
           'dateCreated': dateCreated,
           'uid': userId,
+          'deleted': 0,
         });
 
         debugPrint("Dados do usuário salvos no Firestore com sucesso");
