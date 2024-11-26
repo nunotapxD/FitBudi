@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
+import 'dart:io';
+import 'package:url_launcher/url_launcher.dart';
 
 class ChatPage extends StatefulWidget {
   final String otherUserId;
@@ -22,32 +25,32 @@ class _ChatPageState extends State<ChatPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final ScrollController _scrollController = ScrollController();
+  bool _isLoading = false;
 
   Stream<QuerySnapshot> _getMessages() {
     final currentUserId = _auth.currentUser?.uid;
     
     return _firestore
         .collection('messages')
-        .where('senderId', whereIn: [currentUserId, widget.otherUserId])
-        .where('receiverId', whereIn: [currentUserId, widget.otherUserId])
+        .where(Filter.or(
+          Filter.and(
+            Filter('senderId', isEqualTo: currentUserId),
+            Filter('receiverId', isEqualTo: widget.otherUserId),
+          ),
+          Filter.and(
+            Filter('senderId', isEqualTo: widget.otherUserId),
+            Filter('receiverId', isEqualTo: currentUserId),
+          ),
+        ))
         .orderBy('timestamp', descending: true)
         .snapshots();
   }
 
-  Future<void> _sendMessage() async {
+  Future<void> _sendTextMessage() async {
     if (_messageController.text.trim().isEmpty) return;
 
-    final user = _auth.currentUser;
-    if (user == null) return;
-
     try {
-      await _firestore.collection('messages').add({
-        'text': _messageController.text.trim(),
-        'senderId': user.uid,
-        'receiverId': widget.otherUserId,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-
+      await _sendMessage(messageText: _messageController.text.trim());
       _messageController.clear();
       _scrollToBottom();
     } catch (e) {
@@ -59,11 +62,82 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  Future<void> _sendMessage({
+    String? messageText,
+    String? fileName,
+    String? fileType,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final message = {
+        'senderId': user.uid,
+        'receiverId': widget.otherUserId,
+        'timestamp': FieldValue.serverTimestamp(),
+        if (messageText != null) 'text': messageText,
+        if (fileName != null) 'fileName': fileName,
+        if (fileType != null) 'fileType': fileType,
+      };
+
+      await _firestore.collection('messages').add(message);
+    } catch (e) {
+      throw Exception('Erro ao enviar mensagem: $e');
+    }
+  }
+
+  Future<void> _handleFilePick() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: false,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        final fileName = file.name;
+        final fileExt = fileName.split('.').last.toLowerCase();
+
+        // Aqui você pode implementar a lógica de upload do arquivo
+        // Por enquanto, vamos apenas simular enviando o nome do arquivo
+        await _sendMessage(
+          fileName: fileName,
+          fileType: fileExt,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao selecionar arquivo: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   Widget _buildMessage(Map<String, dynamic> message, bool isMe) {
     final timestamp = message['timestamp'] as Timestamp?;
     final time = timestamp != null 
         ? DateFormat('HH:mm').format(timestamp.toDate())
         : '';
+
+    if (message['fileName'] != null) {
+      return FileMessageBubble(
+        fileName: message['fileName'],
+        fileType: message['fileType'] ?? '',
+        isSent: isMe,
+        time: time,
+      );
+    }
 
     return MessageBubble(
       message: message['text'] ?? '',
@@ -76,21 +150,11 @@ class _ChatPageState extends State<ChatPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E), // Cor de fundo escura
+        backgroundColor: const Color(0xFF1E1E1E),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.phone, color: Colors.white),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
-            onPressed: () {},
-          ),
-        ],
         title: Row(
           children: [
             CircleAvatar(
@@ -124,7 +188,7 @@ class _ChatPageState extends State<ChatPage> {
         ),
       ),
       body: Container(
-        color: const Color(0xFF1E1E1E), // Cor de fundo escura
+        color: const Color(0xFF1E1E1E),
         child: Column(
           children: [
             Expanded(
@@ -163,9 +227,12 @@ class _ChatPageState extends State<ChatPage> {
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.mic,
-                    color: Colors.grey,
+                  IconButton(
+                    icon: const Icon(
+                      Icons.attach_file,
+                      color: Colors.grey,
+                    ),
+                    onPressed: _handleFilePick,
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -177,22 +244,22 @@ class _ChatPageState extends State<ChatPage> {
                         hintStyle: TextStyle(color: Colors.grey),
                         border: InputBorder.none,
                       ),
+                      onSubmitted: (_) => _sendTextMessage(),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(
-                      Icons.emoji_emotions,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _sendMessage,
-                    icon: const Icon(
-                      Icons.send,
-                      color: Colors.green,
-                    ),
-                  ),
+                  _isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : IconButton(
+                          onPressed: _sendTextMessage,
+                          icon: const Icon(
+                            Icons.send,
+                            color: Colors.green,
+                          ),
+                        ),
                 ],
               ),
             ),
@@ -240,7 +307,7 @@ class MessageBubble extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: isSent ? Colors.white : const Color(0xFF2C6BED), // Azul para recebidas, branco para enviadas
+          color: isSent ? Colors.white : const Color(0xFF2C6BED),
           borderRadius: BorderRadius.only(
             topLeft: isSent ? const Radius.circular(16) : const Radius.circular(0),
             topRight: isSent ? const Radius.circular(0) : const Radius.circular(16),
@@ -256,6 +323,91 @@ class MessageBubble extends StatelessWidget {
               style: TextStyle(
                 color: isSent ? Colors.black : Colors.white,
               ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              time,
+              style: TextStyle(
+                color: isSent ? Colors.black54 : Colors.white70,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class FileMessageBubble extends StatelessWidget {
+  final String fileName;
+  final String fileType;
+  final bool isSent;
+  final String time;
+
+  const FileMessageBubble({
+    Key? key,
+    required this.fileName,
+    required this.fileType,
+    required this.isSent,
+    required this.time,
+  }) : super(key: key);
+
+  IconData _getFileIcon() {
+    switch (fileType.toLowerCase()) {
+      case 'pdf':
+        return Icons.picture_as_pdf;
+      case 'doc':
+      case 'docx':
+        return Icons.description;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+        return Icons.image;
+      default:
+        return Icons.insert_drive_file;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: isSent ? Alignment.bottomRight : Alignment.bottomLeft,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: isSent ? Colors.white : const Color(0xFF2C6BED),
+          borderRadius: BorderRadius.only(
+            topLeft: isSent ? const Radius.circular(16) : const Radius.circular(0),
+            topRight: isSent ? const Radius.circular(0) : const Radius.circular(16),
+            bottomLeft: const Radius.circular(16),
+            bottomRight: const Radius.circular(16),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: isSent ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _getFileIcon(),
+                  color: isSent ? Colors.black : Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    fileName,
+                    style: TextStyle(
+                      color: isSent ? Colors.black : Colors.white,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(
