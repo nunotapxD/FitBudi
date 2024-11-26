@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Adicione esta importação
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'firebase_options.dart';
 
@@ -71,6 +72,10 @@ class MyApp extends StatelessWidget {
       onGenerateRoute: (settings) {
         print('Attempting to generate route: ${settings.name}');
         
+        // Verificar o usuário atual
+        final auth = FirebaseAuth.instance;
+        final user = auth.currentUser;
+        
         switch (settings.name) {
           case '/':
           case '/login':
@@ -80,13 +85,22 @@ class MyApp extends StatelessWidget {
             return MaterialPageRoute(builder: (_) => const ClientDashboardPage());
             
           case '/adminDashboard':
-            return MaterialPageRoute(builder: (_) => AdminDashboardPage());
+            return MaterialPageRoute(builder: (_) => const AdminDashboardPage());
             
           case '/chat':
             return MaterialPageRoute(builder: (_) => const ChatListPage());
             
           case '/calendar':
-            return MaterialPageRoute(builder: (_) => const CalendarPage());
+            if (user != null) {
+              return MaterialPageRoute(
+                builder: (_) => CalendarPage(
+                  userId: user.uid,
+                  isAdmin: false, // Cliente acessando direto pelo menu
+                ),
+              );
+            } else {
+              return MaterialPageRoute(builder: (_) => const LoginSelectionPage());
+            }
             
           case '/meals':
             return MaterialPageRoute(builder: (_) => const MealsPage());

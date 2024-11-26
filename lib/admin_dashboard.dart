@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'AdminMealPage.dart';
+import 'calendar_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -332,6 +333,9 @@ class UserCalendarWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(child: Text('Calendário do usuário: $userId'));
+    return CalendarPage(
+      userId: userId,
+      isAdmin: true,
+    );
   }
 }
