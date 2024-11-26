@@ -244,7 +244,7 @@ class _CalendarPageState extends State<CalendarPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Agenda - $_userName'),
+        title: Text('Agenda'),
         actions: widget.isAdmin ? [
           IconButton(
             icon: const Icon(Icons.add),

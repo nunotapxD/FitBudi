@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'AdminMealPage.dart';
 import 'calendar_page.dart';
 
-class AdminDashboardPage extends StatefulWidget {
+class AdminDashboardPage extends StatefulWidget { 
   const AdminDashboardPage({super.key});
 
   @override

@@ -29,10 +29,10 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
     }
   }
 
-  String _getFormattedDate() {
+ /* String _getFormattedDate() {
     final now = DateTime.now();
     return DateFormat.yMMMMEEEEd('pt_BR').format(now);
-  }
+  }*/
 
   @override
   Widget build(BuildContext context) {
@@ -53,11 +53,11 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
           children: [
             const SizedBox(height: 24),
             
-            // Data atual
+          /*  // Data atual
             Column(
               children: [
                 Text(
-                  _getFormattedDate(),
+             //     _getFormattedDate(),
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -72,9 +72,9 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                   ),
                 ),
               ],
-            ),
+            ),*/
             
-            const SizedBox(height: 32),
+           // const SizedBox(height: 32),
             
             // Grid de funcionalidades
             Expanded(
