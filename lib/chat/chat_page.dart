@@ -124,27 +124,28 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  Widget _buildMessage(Map<String, dynamic> message, bool isMe) {
-    final timestamp = message['timestamp'] as Timestamp?;
-    final time = timestamp != null 
-        ? DateFormat('HH:mm').format(timestamp.toDate())
-        : '';
+Widget _buildMessage(Map<String, dynamic> message, bool isMe) {
+  final timestamp = message['timestamp'] as Timestamp?;
+  final time = timestamp != null 
+      ? DateFormat('HH:mm').format(timestamp.toDate())
+      : '';
 
-    if (message['fileName'] != null) {
-      return FileMessageBubble(
-        fileName: message['fileName'],
-        fileType: message['fileType'] ?? '',
-        isSent: isMe,
-        time: time,
-      );
-    }
-
-    return MessageBubble(
-      message: message['text'] ?? '',
+  if (message['fileName'] != null) {
+    return FileMessageBubble(
+      fileName: message['fileName'],
+      fileType: message['fileType'] ?? '',
+      fileUrl: message['fileUrl'], // Adicionado
       isSent: isMe,
       time: time,
     );
   }
+
+  return MessageBubble(
+    message: message['text'] ?? '',
+    isSent: isMe,
+    time: time,
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -344,6 +345,7 @@ class FileMessageBubble extends StatelessWidget {
   final String fileType;
   final bool isSent;
   final String time;
+  final String? fileUrl; // Adicionado para armazenar a URL do arquivo
 
   const FileMessageBubble({
     Key? key,
@@ -351,6 +353,7 @@ class FileMessageBubble extends StatelessWidget {
     required this.fileType,
     required this.isSent,
     required this.time,
+    this.fileUrl,
   }) : super(key: key);
 
   IconData _getFileIcon() {
@@ -363,10 +366,66 @@ class FileMessageBubble extends StatelessWidget {
       case 'jpg':
       case 'jpeg':
       case 'png':
+      case 'gif':
         return Icons.image;
+      case 'mp4':
+      case 'mov':
+      case 'avi':
+        return Icons.video_file;
+      case 'mp3':
+      case 'wav':
+      case 'm4a':
+        return Icons.audio_file;
       default:
         return Icons.insert_drive_file;
     }
+  }
+
+  bool get _isImage {
+    final imageExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+    return imageExtensions.contains(fileType.toLowerCase());
+  }
+
+  void _showImagePreview(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppBar(
+              title: Text(fileName),
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Image.network(
+                fileUrl ?? '',
+                errorBuilder: (context, error, stackTrace) => const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('Erro ao carregar imagem'),
+                ),
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -388,6 +447,27 @@ class FileMessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: isSent ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
+            if (_isImage && fileUrl != null) ...[
+              GestureDetector(
+                onTap: () => _showImagePreview(context),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    fileUrl!,
+                    width: 200,
+                    height: 150,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: 200,
+                      height: 150,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.error),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
