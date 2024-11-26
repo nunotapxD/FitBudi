@@ -1,19 +1,20 @@
-allprojects {
+// android/build.gradle
+
+buildscript {
     repositories {
-        google()
-        mavenCentral()
+        google()  // Repositório do Google
+        mavenCentral()  // Repositório Maven
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.0.4'  // Versão do plugin do Gradle para Android
+        classpath 'com.google.gms:google-services:4.3.10'  // Plugin do Google Services
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.5.21'  // Plugin Kotlin
     }
 }
-classpath 'com.google.gms:google-services:4.3.10' // Verifique se a versão está atualizada
 
-rootProject.buildDir = "../build"
-subprojects {
-    project.buildDir = "${rootProject.buildDir}/${project.name}"
-}
-subprojects {
-    project.evaluationDependsOn(":app")
-}
-
-tasks.register("clean", Delete) {
-    delete rootProject.buildDir
+allprojects {
+    repositories {
+        google()  // Repositório do Google
+        mavenCentral()  // Repositório Maven
+    }
 }

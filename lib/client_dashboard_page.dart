@@ -120,7 +120,7 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
         ),
       ),
 
-      bottomNavigationBar: Container(
+     /* bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -164,7 +164,7 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
             ],
           ),
         ),
-      ),
+      ),*/
     );
   }
 
