@@ -113,6 +113,24 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                       Navigator.of(context).pushNamed('/chat');
                     },
                   ),
+                  _buildDashboardItem(
+                    context,
+                    'Perfil',
+                    Icons.chat,
+                    Colors.yellow,
+                    () {
+                      Navigator.of(context).pushNamed('/profile');
+                    },
+                  ),
+                  _buildDashboardItem(
+                    context,
+                    'Settings',
+                    Icons.chat,
+                    const Color.fromARGB(255, 112, 112, 112),
+                    () {
+                      Navigator.of(context).pushNamed('/settings');
+                    },
+                  ),
                 ],
               ),
             ),
