@@ -29,11 +29,6 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
     }
   }
 
- /* String _getFormattedDate() {
-    final now = DateTime.now();
-    return DateFormat.yMMMMEEEEd('pt_BR').format(now);
-  }*/
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -52,37 +47,19 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
         child: Column(
           children: [
             const SizedBox(height: 24),
-            
-          /*  // Data atual
-            Column(
-              children: [
-                Text(
-             //     _getFormattedDate(),
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Bem-vindo de volta!',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),*/
-            
-           // const SizedBox(height: 32),
-            
-            // Grid de funcionalidades
             Expanded(
               child: GridView.count(
                 crossAxisCount: 2,
                 mainAxisSpacing: 16,
                 crossAxisSpacing: 16,
                 children: [
+                  _buildDashboardItem(
+                    context,
+                    'Treinos',
+                    Icons.fitness_center,
+                    Colors.purple,
+                    () => Navigator.pushNamed(context, '/workouts'),
+                  ),
                   _buildDashboardItem(
                     context,
                     'Agenda',
@@ -96,13 +73,6 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                     Icons.restaurant,
                     Colors.orange,
                     () => Navigator.pushNamed(context, '/meals'),
-                  ),
-                  _buildDashboardItem(
-                    context,
-                    'Vídeos',
-                    Icons.play_circle,
-                    Colors.red,
-                    () => Navigator.pushNamed(context, '/videos'),
                   ),
                   _buildDashboardItem(
                     context,
@@ -122,11 +92,11 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                       Navigator.of(context).pushNamed('/profile');
                     },
                   ),
-                  _buildDashboardItem(
+                   _buildDashboardItem(
                     context,
                     'Settings',
-                    Icons.settings,
-                    const Color.fromARGB(255, 112, 112, 112),
+                    Icons.person_off_outlined,
+                    const Color.fromARGB(96, 66, 66, 66),
                     () {
                       Navigator.of(context).pushNamed('/settings');
                     },
@@ -137,52 +107,6 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
           ],
         ),
       ),
-
-     /* bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildNavButton(
-                context,
-                Icons.home,
-                'Home',
-                () {}, // Já estamos na home
-                isSelected: true,
-              ),
-              _buildNavButton(
-                context,
-                Icons.fitness_center,
-                'Treinos',
-                () => Navigator.pushNamed(context, '/workouts'),
-              ),
-              _buildNavButton(
-                context,
-                Icons.person,
-                'Perfil',
-                () => Navigator.pushNamed(context, '/profile'),
-              ),
-              _buildNavButton(
-                context,
-                Icons.settings,
-                'Config',
-                () => Navigator.pushNamed(context, '/settings'),
-              ),
-            ],
-          ),
-        ),
-      ),*/
     );
   }
 

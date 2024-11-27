@@ -98,72 +98,41 @@ class _LoginSelectionPageState extends State<LoginSelectionPage> {
     );
   }
 
-  // Function to authenticate user with Firebase
   Future<void> _authenticateUser() async {
-    final email = _emailController.text;
-    final password = _passwordController.text;
+  final email = _emailController.text;
+  final password = _passwordController.text;
 
-    if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, insira e-mail e senha válidos')),
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // Firebase authentication
-      UserCredential userCredential = await FirebaseAuth.instance
-          .signInWithEmailAndPassword(email: email, password: password);
-
-      // Get the user's role from Firestore
-      final userId = userCredential.user?.uid;
-      if (userId == null) throw FirebaseAuthException(code: "user-not-found");
-
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .get();
-
-      if (!userDoc.exists) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Usuário não encontrado no banco de dados')),
-        );
-        return;
-      }
-
-      final userData = userDoc.data();
-      final role = userData?['role'] ?? 'client'; // Default role is 'client'
-
-      // Navigate based on role
-      if (role == 'admin') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => AdminDashboardPage()),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => ClientDashboardPage()),
-        );
-      }
-    } on FirebaseAuthException catch (e) {
-      // Handle Firebase authentication errors
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao fazer login: ${e.message}')),
-      );
-    } catch (e) {
-      // Handle other errors
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro inesperado: $e')),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false; // Properly close the `setState` block
-      });
-    }
+  if (email.isEmpty || password.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Por favor, insira e-mail e senha válidos')),
+    );
+    return;
   }
+
+  setState(() {
+    _isLoading = true;
+  });
+
+  try {
+    // Autenticação Firebase
+    await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+    // Não precisa de navegação manual; o AuthWrapper gerencia isso
+  } on FirebaseAuthException catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Erro ao fazer login: ${e.message}')),
+    );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Erro inesperado: $e')),
+    );
+  } finally {
+    setState(() {
+      _isLoading = false;
+    });
+  }
+ }
 }
