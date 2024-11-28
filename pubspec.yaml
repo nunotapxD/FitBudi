@@ -39,4 +39,8 @@ flutter:
   uses-material-design: true
   assets:
    - lib/assets/image.png
-   - lib/assets/images.jpg
+   - lib/assets/23.jpg
+   - lib/assets/treinos.jpg
+   - lib/assets/agenda.png
+   - lib/assets/nutricao.png
+   - lib/assets/chat.jpg
