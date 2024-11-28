@@ -441,92 +441,93 @@ void _showAddWorkoutDialog(String userId) {
     );
   }
 
-void _showAddWeightDialog(String userId) {
-    final weightController = TextEditingController();
-    final dateController = TextEditingController();
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Registrar Peso'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: weightController,
-              keyboardType: TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Peso (kg)',
-                hintText: 'Ex: 70.5',
-                border: OutlineInputBorder(),
-              ),
+Future<void> _showAddWeightDialog(String userId) async {
+  final weightController = TextEditingController();
+  final dateController = TextEditingController();
+
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Registrar Peso'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: weightController,
+            keyboardType: TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Peso (kg)',
+              hintText: 'Ex: 70.5',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: dateController,
-              readOnly: true,
-              decoration: const InputDecoration(
-                labelText: 'Data',
-                hintText: 'Selecione a data',
-                border: OutlineInputBorder(),
-              ),
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now(),
-                );
-                if (date != null) {
-                  dateController.text = DateFormat('dd/MM/yyyy').format(date);
-                }
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              if (weightController.text.isNotEmpty && dateController.text.isNotEmpty) {
-                try {
-                  final weight = double.parse(weightController.text);
-                  final date = DateFormat('dd/MM/yyyy').parse(dateController.text);
-                  
-                  await _firestore
-                      .collection('users')
-                      .doc(userId)
-                      .collection('weight_history')
-                      .add({
-                    'weight': weight,
-                    'date': date,
-                    'timestamp': Timestamp.fromDate(date),
-                  });
-                  
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Peso registrado com sucesso!')),
-                  );
-                  Navigator.pop(context);
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Erro ao registrar peso. Verifique os dados.')),
-                  );
-                }
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Preencha todos os campos')),
-                );
+          const SizedBox(height: 16),
+          TextField(
+            controller: dateController,
+            readOnly: true,
+            decoration: const InputDecoration(
+              labelText: 'Data',
+              hintText: 'Selecione a data',
+              border: OutlineInputBorder(),
+            ),
+            onTap: () async {
+              final date = await showDatePicker(
+                context: context,
+                initialDate: DateTime.now(),
+                firstDate: DateTime(2020),
+                lastDate: DateTime.now(),
+              );
+              if (date != null) {
+                dateController.text = DateFormat('dd/MM/yyyy').format(date);
               }
             },
-            child: const Text('Salvar'),
           ),
         ],
       ),
-    );
-  }
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            if (weightController.text.isNotEmpty && dateController.text.isNotEmpty) {
+              try {
+                final weight = double.parse(weightController.text);
+                final date = DateFormat('dd/MM/yyyy').parse(dateController.text);
+
+                // Update both weight_history collection and user's current weight
+                await _firestore.collection('users').doc(userId).collection('weight_history').add({
+                  'weight': weight,
+                  'date': Timestamp.fromDate(date),
+                  'timestamp': Timestamp.fromDate(date),
+                });
+
+                await _firestore.collection('users').doc(userId).update({
+                  'weight': weight,
+                });
+
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Peso registrado com sucesso!')),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Erro ao registrar peso. Verifique os dados.')),
+                );
+              }
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Preencha todos os campos')),
+              );
+            }
+          },
+          child: const Text('Salvar'),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildWeightHistory() {
     if (selectedUserId == null) {

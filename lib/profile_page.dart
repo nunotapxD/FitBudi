@@ -158,69 +158,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // Método para adicionar nova entrada de peso
-  Future<void> _addWeightEntry() async {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Adicionar Peso'),
-          content: TextField(
-            controller: _weightController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Peso (kg)',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  final newWeight = double.parse(_weightController.text);
-                  
-                  // Salva no histórico de peso
-                  await _firestore
-                    .collection('users')
-                    .doc(_user!.uid)
-                    .collection('weightHistory')
-                    .add({
-                      'date': DateTime.now(),
-                      'weight': newWeight,
-                    });
-
-                  // Atualiza peso atual
-                  await _firestore
-                    .collection('users')
-                    .doc(_user!.uid)
-                    .update({'weight': newWeight});
-
-                  // Atualiza estado local
-                  setState(() {
-                    _weight = newWeight;
-                    _weightHistory.add(_WeightHistory(
-                      date: DateTime.now(), 
-                      weight: newWeight
-                    ));
-                  });
-
-                  Navigator.of(context).pop();
-                  _showSuccessSnackBar('Peso atualizado com sucesso!');
-                } catch (e) {
-                  _showErrorSnackBar('Erro ao salvar peso: $e');
-                }
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   // Métodos auxiliares de cálculo
   String? _calculateAge() {
@@ -260,121 +197,147 @@ void _showSuccessSnackBar(String message) {
 }
   // Método para construir gráfico de peso
 Widget _buildWeightChart() {
-  if (_weightHistory.isEmpty) {
-    return const Center(child: Text('Sem dados de peso'));
-  }
+  return StreamBuilder<QuerySnapshot>(
+    stream: _firestore
+        .collection('users')
+        .doc(_user!.uid)
+        .collection('weight_history')
+        .orderBy('date')
+        .snapshots(),
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return Center(child: Text('Erro ao carregar dados: ${snapshot.error}'));
+      }
 
-  final minWeight = _weightHistory.map((e) => e.weight).reduce((a, b) => a < b ? a : b);
-  final maxWeight = _weightHistory.map((e) => e.weight).reduce((a, b) => a > b ? a : b);
-  final padding = (maxWeight - minWeight) * 0.1;
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Center(child: CircularProgressIndicator());
+      }
 
-  return SizedBox(
-    height: 300,
-    child: LineChart(
-      LineChartData(
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: true,
-          horizontalInterval: 2,
-          verticalInterval: 1,
-          getDrawingHorizontalLine: (value) => FlLine(
-            color: Colors.grey.withOpacity(0.2),
-            strokeWidth: 1,
-          ),
-          getDrawingVerticalLine: (value) => FlLine(
-            color: Colors.grey.withOpacity(0.2),
-            strokeWidth: 1,
-          ),
-        ),
-        titlesData: FlTitlesData(
-          show: true,
-          topTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          rightTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 30,
-              interval: 1,
-              getTitlesWidget: (double value, TitleMeta meta) {
-                final index = value.toInt();
-                if (index < 0 || index >= _weightHistory.length) {
-                  return const SizedBox.shrink();
-                }
-                return Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    DateFormat('dd/MM').format(_weightHistory[index].date),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.black87,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              interval: 2,
-              reservedSize: 45,
-              getTitlesWidget: (double value, TitleMeta meta) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: Text(
-                    value.toStringAsFixed(1),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.black87,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-        borderData: FlBorderData(
-          show: true,
-          border: Border.all(color: Colors.grey.withOpacity(0.3)),
-        ),
-        minX: 0,
-        maxX: (_weightHistory.length - 1).toDouble(),
-        minY: minWeight - padding,
-        maxY: maxWeight + padding,
-        lineBarsData: [
-          LineChartBarData(
-            spots: _weightHistory.asMap().entries.map((entry) {
-              return FlSpot(
-                entry.key.toDouble(),
-                entry.value.weight,
-              );
-            }).toList(),
-            isCurved: true,
-            color: Colors.blue.shade500,
-            barWidth: 3,
-            isStrokeCapRound: true,
-            dotData: FlDotData(
+      final weightHistory = snapshot.data?.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return _WeightHistory(
+          date: (data['date'] as Timestamp).toDate(),
+          weight: data['weight'].toDouble(),
+        );
+      }).toList() ?? [];
+
+      if (weightHistory.isEmpty) {
+        return const Center(child: Text('Sem dados de peso'));
+      }
+
+      final minWeight = weightHistory.map((e) => e.weight).reduce((a, b) => a < b ? a : b);
+      final maxWeight = weightHistory.map((e) => e.weight).reduce((a, b) => a > b ? a : b);
+      final padding = (maxWeight - minWeight) * 0.1;
+
+      return SizedBox(
+        height: 300,
+        child: LineChart(
+          LineChartData(
+            gridData: FlGridData(
               show: true,
-              getDotPainter: (spot, percent, barData, index) => 
-                FlDotCirclePainter(
-                  radius: 4,
-                  color: Colors.blue.shade500,
-                  strokeWidth: 2,
-                  strokeColor: Colors.white,
+              drawVerticalLine: true,
+              horizontalInterval: 2,
+              verticalInterval: 1,
+              getDrawingHorizontalLine: (value) => FlLine(
+                color: Colors.grey.withOpacity(0.2),
+                strokeWidth: 1,
+              ),
+              getDrawingVerticalLine: (value) => FlLine(
+                color: Colors.grey.withOpacity(0.2),
+                strokeWidth: 1,
+              ),
+            ),
+            titlesData: FlTitlesData(
+              show: true,
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 30,
+                  interval: 1,
+                  getTitlesWidget: (double value, TitleMeta meta) {
+                    final index = value.toInt();
+                    if (index < 0 || index >= weightHistory.length) {
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        DateFormat('dd/MM').format(weightHistory[index].date),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    );
+                  },
                 ),
+              ),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  interval: 2,
+                  reservedSize: 45,
+                  getTitlesWidget: (double value, TitleMeta meta) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: Text(
+                        value.toStringAsFixed(1),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
-            belowBarData: BarAreaData(
+            borderData: FlBorderData(
               show: true,
-              color: Colors.blue.shade200.withOpacity(0.3),
+              border: Border.all(color: Colors.grey.withOpacity(0.3)),
             ),
+            minX: 0,
+            maxX: (weightHistory.length - 1).toDouble(),
+            minY: minWeight - padding,
+            maxY: maxWeight + padding,
+            lineBarsData: [
+              LineChartBarData(
+                spots: weightHistory.asMap().entries.map((entry) {
+                  return FlSpot(
+                    entry.key.toDouble(),
+                    entry.value.weight,
+                  );
+                }).toList(),
+                isCurved: true,
+                color: Colors.blue.shade500,
+                barWidth: 3,
+                isStrokeCapRound: true,
+                dotData: FlDotData(
+                  show: true,
+                  getDotPainter: (spot, percent, barData, index) => 
+                    FlDotCirclePainter(
+                      radius: 4,
+                      color: Colors.blue.shade500,
+                      strokeWidth: 2,
+                      strokeColor: Colors.white,
+                    ),
+                ),
+                belowBarData: BarAreaData(
+                  show: true,
+                  color: Colors.blue.shade200.withOpacity(0.3),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    ),
+        ),
+      );
+    },
   );
 }
 
@@ -561,10 +524,6 @@ Column(
                             child: _buildWeightChart(),
                           ),
                           const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _addWeightEntry,
-                            child: const Text('Adicionar Peso'),
-                          ),
                         ],
                       ),
                   ],
