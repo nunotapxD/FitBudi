@@ -264,81 +264,116 @@ Widget _buildWeightChart() {
     return const Center(child: Text('Sem dados de peso'));
   }
 
-  return LineChart(
-    LineChartData(
-      gridData: FlGridData(
-        show: true,
-        drawVerticalLine: true,
-        horizontalInterval: 1,
-        verticalInterval: 1,
-        getDrawingHorizontalLine: (value) {
-          return FlLine(
+  final minWeight = _weightHistory.map((e) => e.weight).reduce((a, b) => a < b ? a : b);
+  final maxWeight = _weightHistory.map((e) => e.weight).reduce((a, b) => a > b ? a : b);
+  final padding = (maxWeight - minWeight) * 0.1;
+
+  return SizedBox(
+    height: 300,
+    child: LineChart(
+      LineChartData(
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: true,
+          horizontalInterval: 2,
+          verticalInterval: 1,
+          getDrawingHorizontalLine: (value) => FlLine(
             color: Colors.grey.withOpacity(0.2),
             strokeWidth: 1,
-          );
-        },
-        getDrawingVerticalLine: (value) {
-          return FlLine(
+          ),
+          getDrawingVerticalLine: (value) => FlLine(
             color: Colors.grey.withOpacity(0.2),
             strokeWidth: 1,
-          );
-        },
-      ),
-      titlesData: FlTitlesData(
-        show: true,
-        bottomTitles: SideTitles(
-          showTitles: true,
-          reservedSize: 30,
-          interval: 1,
-          getTextStyles: (context, value) => const TextStyle(fontSize: 10),
-          getTitles: (value) {
-            final index = value.toInt();
-            if (index < 0 || index >= _weightHistory.length) {
-              return '';
-            }
-            return DateFormat('dd/MM').format(_weightHistory[index].date);
-          },
-        ),
-        leftTitles: SideTitles(
-          showTitles: true,
-          interval: 1,
-          getTextStyles: (context, value) => const TextStyle(fontSize: 10),
-          getTitles: (value) => value.toStringAsFixed(1),
-          reservedSize: 42,
-        ),
-        rightTitles: SideTitles(showTitles: false),
-        topTitles: SideTitles(showTitles: false),
-      ),
-      borderData: FlBorderData(
-        show: true,
-        border: Border.all(color: const Color(0xff37434d)),
-      ),
-      minX: 0,
-      maxX: (_weightHistory.length - 1).toDouble(),
-      minY: _weightHistory.map((e) => e.weight).reduce((a, b) => a < b ? a : b) - 5,
-      maxY: _weightHistory.map((e) => e.weight).reduce((a, b) => a > b ? a : b) + 5,
-      lineBarsData: [
-        LineChartBarData(
-          spots: _weightHistory.asMap().entries.map((entry) {
-            return FlSpot(
-              entry.key.toDouble(),
-              entry.value.weight,
-            );
-          }).toList(),
-          isCurved: true,
-          colors: [Colors.blue.shade300, Colors.blue.shade700],
-          barWidth: 3,
-          isStrokeCapRound: true,
-          dotData: FlDotData(show: true),
-          belowBarData: BarAreaData(
-            show: true,
-            colors: [
-              Colors.blue.shade200.withOpacity(0.4),
-              Colors.blue.shade700.withOpacity(0.1),
-            ],
           ),
         ),
-      ],
+        titlesData: FlTitlesData(
+          show: true,
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 30,
+              interval: 1,
+              getTitlesWidget: (double value, TitleMeta meta) {
+                final index = value.toInt();
+                if (index < 0 || index >= _weightHistory.length) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    DateFormat('dd/MM').format(_weightHistory[index].date),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.black87,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              interval: 2,
+              reservedSize: 45,
+              getTitlesWidget: (double value, TitleMeta meta) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: Text(
+                    value.toStringAsFixed(1),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.black87,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        borderData: FlBorderData(
+          show: true,
+          border: Border.all(color: Colors.grey.withOpacity(0.3)),
+        ),
+        minX: 0,
+        maxX: (_weightHistory.length - 1).toDouble(),
+        minY: minWeight - padding,
+        maxY: maxWeight + padding,
+        lineBarsData: [
+          LineChartBarData(
+            spots: _weightHistory.asMap().entries.map((entry) {
+              return FlSpot(
+                entry.key.toDouble(),
+                entry.value.weight,
+              );
+            }).toList(),
+            isCurved: true,
+            color: Colors.blue.shade500,
+            barWidth: 3,
+            isStrokeCapRound: true,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, barData, index) => 
+                FlDotCirclePainter(
+                  radius: 4,
+                  color: Colors.blue.shade500,
+                  strokeWidth: 2,
+                  strokeColor: Colors.white,
+                ),
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              color: Colors.blue.shade200.withOpacity(0.3),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
