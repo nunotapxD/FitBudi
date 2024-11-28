@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -18,7 +19,7 @@ class SettingsPage extends StatelessWidget {
 
   Future<void> _resetPassword(BuildContext context) async {
     try {
-      final user = FirebaseAuth.instance.currentUser ;
+      final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         await FirebaseAuth.instance.sendPasswordResetEmail(email: user.email!);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -39,6 +40,17 @@ class SettingsPage extends StatelessWidget {
 
   Future<void> _updateDisplayName(BuildContext context) async {
     final TextEditingController nameController = TextEditingController();
+    final user = FirebaseAuth.instance.currentUser;
+    
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("No user is logged in.")),
+      );
+      return;
+    }
+
+    nameController.text = user.displayName ?? '';
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -48,36 +60,52 @@ class SettingsPage extends StatelessWidget {
             controller: nameController,
             decoration: InputDecoration(
               labelText: "New Display Name",
+              hintText: "Enter your new display name",
             ),
+            autofocus: true,
           ),
           actions: [
             TextButton(
-              onPressed: () async {
-                final newName = nameController.text.trim();
-                if (newName.isNotEmpty) {
-                  try {
-                    final user = FirebaseAuth.instance.currentUser ;
-                    await user?.updateDisplayName(newName);
-                    await user?.reload();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Display name updated successfully.")),
-                    );
-                  } catch (e) {
-                    print("Error updating display name: $e");
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Error updating display name. Please try again.")),
-                    );
-                  }
-                }
-                Navigator.of(context).pop();
-              },
-              child: Text("Save"),
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text("Cancel"),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
+              onPressed: () async {
+                final newName = nameController.text.trim();
+                if (newName.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Display name cannot be empty.")),
+                  );
+                  return;
+                }
+
+                try {
+                  // Update in Firebase Authentication
+                  await user.updateDisplayName(newName);
+                  await user.reload();
+
+                  // Update in Firestore Database with 'name' field
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .update({
+                    'name': newName,
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  });
+                  
+                  Navigator.of(context).pop();
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Display name updated successfully.")),
+                  );
+                } catch (e) {
+                  print("Error updating display name: $e");
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Error updating display name. Please try again.")),
+                  );
+                }
               },
-              child: Text("Cancel"),
+              child: Text("Save"),
             ),
           ],
         );

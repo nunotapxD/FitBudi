@@ -95,22 +95,14 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                 ),
                 const SizedBox(height: 40),
                 
-                const Text(
-                  'Principais Recursos',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
                 const SizedBox(height: 20),
                 Expanded(
                   flex: 3,
                   child: GridView.count(
                     physics: const NeverScrollableScrollPhysics(),
                     crossAxisCount: 2,
-                    mainAxisSpacing: 20,
-                    crossAxisSpacing: 20,
+                    mainAxisSpacing: 10, // Reduced from 20
+                    crossAxisSpacing: 10, // Reduced from 20
                     childAspectRatio: 0.85,
                     children: [
                       _buildFeatureCard(
@@ -148,18 +140,7 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
-                
-                const Text(
-                  'Acesso Rápido',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Expanded(
+               Expanded(
                   flex: 1,
                   child: Row(
                     children: [
@@ -172,7 +153,7 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                           '/profile',
                         ),
                       ),
-                      const SizedBox(width: 20),
+                      const SizedBox(width: 10), // Reduced from 20
                       Expanded(
                         child: _buildQuickAccessCard(
                           context,
@@ -203,6 +184,7 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
   ) {
     return Card(
       elevation: 2,
+      margin: EdgeInsets.zero, // Remove default card margin
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
       ),
@@ -288,6 +270,7 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
   ) {
     return Card(
       elevation: 2,
+      margin: EdgeInsets.zero, // Remove default card margin
       color: Colors.black.withOpacity(0.5),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
