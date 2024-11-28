@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 class ClientDashboardPage extends StatefulWidget {
@@ -12,15 +12,32 @@ class ClientDashboardPage extends StatefulWidget {
 }
 
 class _ClientDashboardPageState extends State<ClientDashboardPage> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String userName = '';
+
   @override
   void initState() {
     super.initState();
     initializeDateFormatting('pt_BR', null);
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      final userData = await _firestore.collection('users').doc(user.uid).get();
+      if (mounted) {
+        setState(() {
+          userName = userData.data()?['name'] ?? 'Usuário';
+        });
+      }
+    }
   }
 
   Future<void> _handleLogout(BuildContext context) async {
     try {
-      await FirebaseAuth.instance.signOut();
+      await _auth.signOut();
       Navigator.pushReplacementNamed(context, '/login');
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -32,162 +49,280 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('FitBudi'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => _handleLogout(context),
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('lib/assets/images.jpg'),
+            fit: BoxFit.cover,
           ),
-        ],
-      ),
-
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Column(
-          children: [
-            const SizedBox(height: 24),
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                children: [
-                  _buildDashboardItem(
-                    context,
-                    'Treinos',
-                    Icons.fitness_center,
-                    Colors.purple,
-                    () => Navigator.pushNamed(context, '/workouts'),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Olá, ${userName.split(' ')[0]}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 28,
+                          ),
+                        ),
+                        Text(
+                          'Bem-vindo de volta!',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.logout, color: Colors.white),
+                      onPressed: () => _handleLogout(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 40),
+                
+                const Text(
+                  'Principais Recursos',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
-                  _buildDashboardItem(
-                    context,
-                    'Agenda',
-                    Icons.calendar_today,
-                    Colors.blue,
-                    () => Navigator.pushNamed(context, '/calendar'),
+                ),
+                const SizedBox(height: 20),
+                Expanded(
+                  flex: 3,
+                  child: GridView.count(
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 20,
+                    crossAxisSpacing: 20,
+                    childAspectRatio: 0.85,
+                    children: [
+                      _buildFeatureCard(
+                        context,
+                        'Treinos',
+                        Icons.fitness_center,
+                        Colors.deepPurple,
+                        'Acompanhe seu progresso',
+                        '/workouts',
+                      ),
+                      _buildFeatureCard(
+                        context,
+                        'Agenda',
+                        Icons.calendar_today,
+                        Colors.blue,
+                        'Organize seus horários',
+                        '/calendar',
+                      ),
+                      _buildFeatureCard(
+                        context,
+                        'Nutrição',
+                        Icons.restaurant_menu,
+                        Colors.orange,
+                        'Gerencie sua dieta',
+                        '/meals',
+                      ),
+                      _buildFeatureCard(
+                        context,
+                        'Chat',
+                        Icons.chat_bubble_outline,
+                        Colors.green,
+                        'Converse com seu instrutor',
+                        '/chat',
+                      ),
+                    ],
                   ),
-                  _buildDashboardItem(
-                    context,
-                    'Refeições',
-                    Icons.restaurant,
-                    Colors.orange,
-                    () => Navigator.pushNamed(context, '/meals'),
+                ),
+                const SizedBox(height: 20),
+                
+                const Text(
+                  'Acesso Rápido',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
-                  _buildDashboardItem(
-                    context,
-                    'Chat',
-                    Icons.chat,
-                    Colors.green,
-                    () {
-                      Navigator.of(context).pushNamed('/chat');
-                    },
+                ),
+                const SizedBox(height: 20),
+                Expanded(
+                  flex: 1,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildQuickAccessCard(
+                          context,
+                          'Perfil',
+                          Icons.person_outline,
+                          Theme.of(context).primaryColor,
+                          '/profile',
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: _buildQuickAccessCard(
+                          context,
+                          'Configurações',
+                          Icons.settings_outlined,
+                          Colors.blueGrey,
+                          '/settings',
+                        ),
+                      ),
+                    ],
                   ),
-                  _buildDashboardItem(
-                    context,
-                    'Perfil',
-                    Icons.person_off_outlined,
-                    Colors.yellow,
-                    () {
-                      Navigator.of(context).pushNamed('/profile');
-                    },
-                  ),
-                   _buildDashboardItem(
-                    context,
-                    'Settings',
-                    Icons.person_off_outlined,
-                    const Color.fromARGB(96, 66, 66, 66),
-                    () {
-                      Navigator.of(context).pushNamed('/settings');
-                    },
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildDashboardItem(
+  Widget _buildFeatureCard(
     BuildContext context,
     String title,
     IconData icon,
     Color color,
-    VoidCallback onTap,
+    String description,
+    String route,
   ) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: color.withOpacity(0.3),
-            width: 2,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 40,
-              color: color,
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: InkWell(
+        onTap: () => Navigator.pushNamed(context, route),
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                color.withOpacity(0.9),
+                color,
+              ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: color.withOpacity(0.8),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
               ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -20,
+                  bottom: -20,
+                  child: Icon(
+                    icon,
+                    size: 100,
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        icon,
+                        size: 40,
+                        color: Colors.white,
+                      ),
+                      const Spacer(),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        description,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildNavButton(
+  Widget _buildQuickAccessCard(
     BuildContext context,
+    String title,
     IconData icon,
-    String label,
-    VoidCallback onTap, {
-    bool isSelected = false,
-  }) {
-    final theme = Theme.of(context);
-    final color = isSelected ? theme.primaryColor : Colors.grey;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? theme.primaryColor.withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: color,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+    Color color,
+    String route,
+  ) {
+    return Card(
+      elevation: 2,
+      color: Colors.black.withOpacity(0.5),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: InkWell(
+        onTap: () => Navigator.pushNamed(context, route),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 30,
+                  color: Colors.white,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
