@@ -206,7 +206,7 @@ class _AdminMealPageState extends State<AdminMealPage> {
                   .add({
                 'mealName': nameController.text,
                 'mealType': selectedMealType,
-                'date': Timestamp.fromDate(date),
+                'date': Timestamp.fromDate(DateFormat('dd/MM/yyyy').parse(dateController.text)),
                 'time': timeController.text,
                 'calories': int.tryParse(caloriesController.text) ?? 0,
                 'protein': double.tryParse(proteinController.text) ?? 0,
@@ -370,13 +370,14 @@ class _AdminMealPageState extends State<AdminMealPage> {
                   .doc(widget.userId)
                   .collection('meals')
                   .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(
-                    DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
+                     DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
                   ))
                   .where('date', isLessThan: Timestamp.fromDate(
-                    DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day + 1),
+                     DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day + 1),  
                   ))
                   .orderBy('date')
                   .orderBy('time')
+
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
