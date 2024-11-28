@@ -4,7 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
-  // Função para fazer logout
   Future<void> _logout(BuildContext context) async {
     try {
       await FirebaseAuth.instance.signOut();
@@ -17,10 +16,9 @@ class SettingsPage extends StatelessWidget {
     }
   }
 
-  // Função para redefinir senha
   Future<void> _resetPassword(BuildContext context) async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = FirebaseAuth.instance.currentUser ;
       if (user != null) {
         await FirebaseAuth.instance.sendPasswordResetEmail(email: user.email!);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -39,7 +37,6 @@ class SettingsPage extends StatelessWidget {
     }
   }
 
-  // Função para atualizar o nome da conta
   Future<void> _updateDisplayName(BuildContext context) async {
     final TextEditingController nameController = TextEditingController();
     showDialog(
@@ -59,7 +56,7 @@ class SettingsPage extends StatelessWidget {
                 final newName = nameController.text.trim();
                 if (newName.isNotEmpty) {
                   try {
-                    final user = FirebaseAuth.instance.currentUser;
+                    final user = FirebaseAuth.instance.currentUser ;
                     await user?.updateDisplayName(newName);
                     await user?.reload();
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -93,24 +90,42 @@ class SettingsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text('Settings'),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.blue, Colors.purple],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
-      body: Center(
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
-            ListTile(
-              title: Text("Logout"),
-              leading: Icon(Icons.exit_to_app),
-              onTap: () => Navigator.pushReplacementNamed(context, '/login'),
+            Card(
+              child: ListTile(
+                title: Text("Logout"),
+                leading: Icon(Icons.exit_to_app),
+                onTap: () => _logout(context),
+              ),
             ),
-            ListTile(
-              title: Text("Reset Password"),
-              leading: Icon(Icons.lock_reset),
-              onTap: () => _resetPassword(context),
+            SizedBox(height: 10),
+            Card(
+              child: ListTile(
+                title: Text("Reset Password"),
+                leading: Icon(Icons.lock_reset),
+                onTap: () => _resetPassword(context),
+              ),
             ),
-            ListTile(
-              title: Text("Update Display Name"),
-              leading: Icon(Icons.person),
-              onTap: () => _updateDisplayName(context),
+            SizedBox(height: 10),
+            Card(
+              child: ListTile(
+                title: Text("Update Display Name"),
+                leading: Icon(Icons.person),
+                onTap: () => _updateDisplayName(context),
+              ),
             ),
           ],
         ),

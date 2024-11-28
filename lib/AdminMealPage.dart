@@ -1,331 +1,779 @@
+// lib/pages/admin/admin_meal_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 class AdminMealPage extends StatefulWidget {
   final String userId;
-  
-  const AdminMealPage({
-    Key? key,
-    required this.userId,
-  }) : super(key: key);
+  const AdminMealPage({Key? key, required this.userId}) : super(key: key);
 
   @override
   State<AdminMealPage> createState() => _AdminMealPageState();
 }
 
 class _AdminMealPageState extends State<AdminMealPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _mealTypeController = TextEditingController();
-  final _mealNameController = TextEditingController();
-  final _timeController = TextEditingController();
-  final _caloriesController = TextEditingController();
-  final _proteinController = TextEditingController();
-  final _carbsController = TextEditingController();
-  final _fatsController = TextEditingController();
-  final List<String> _ingredients = [];
-  final _ingredientController = TextEditingController();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   DateTime _selectedDate = DateTime.now();
 
-  // Lista de tipos de refeição pré-definidos
-  final List<String> _mealTypes = [
-    'Café da Manhã',
-    'Lanche da Manhã',
-    'Almoço',
-    'Lanche da Tarde',
-    'Jantar',
-    'Ceia'
-  ];
-
-  @override
-  void dispose() {
-    _mealTypeController.dispose();
-    _mealNameController.dispose();
-    _timeController.dispose();
-    _caloriesController.dispose();
-    _proteinController.dispose();
-    _carbsController.dispose();
-    _fatsController.dispose();
-    _ingredientController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2024),
-      lastDate: DateTime(2025),
+  Future<void> _addMeal() async {
+    final nameController = TextEditingController();
+    final caloriesController = TextEditingController();
+    final proteinController = TextEditingController();
+    final carbsController = TextEditingController();
+    final fatsController = TextEditingController();
+    final timeController = TextEditingController();
+    final dateController = TextEditingController(
+      text: DateFormat('dd/MM/yyyy').format(_selectedDate),
     );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-    }
-  }
+    String selectedMealType = 'Café da Manhã';
 
-  Future<void> _selectTime(BuildContext context) async {
-    final TimeOfDay? picked = await showTimePicker(
+    final mealTypes = [
+      'Café da Manhã',
+      'Lanche da Manhã',
+      'Almoço',
+      'Lanche da Tarde',
+      'Jantar',
+      'Ceia',
+      'Pré-Treino',
+      'Pós-Treino',
+    ];
+
+    await showDialog(
       context: context,
-      initialTime: TimeOfDay.now(),
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Adicionar Refeição'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nome da Refeição',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.restaurant_menu),
+                ),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: selectedMealType,
+                decoration: const InputDecoration(
+                  labelText: 'Tipo de Refeição',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.category),
+                ),
+                items: mealTypes.map((type) {
+                  return DropdownMenuItem(
+                    value: type,
+                    child: Text(type),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    selectedMealType = value;
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: dateController,
+                      readOnly: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Data',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.calendar_today),
+                      ),
+                      onTap: () async {
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate: _selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2025),
+                          locale: const Locale('pt', 'BR'),
+                        );
+                        if (date != null) {
+                          dateController.text = DateFormat('dd/MM/yyyy').format(date);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextField(
+                      controller: timeController,
+                      readOnly: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Horário',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.access_time),
+                      ),
+                      onTap: () async {
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.now(),
+                        );
+                        if (time != null) {
+                          timeController.text = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: caloriesController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Calorias (kcal)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.local_fire_department),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: proteinController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Proteínas (g)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.egg),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: carbsController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Carboidratos (g)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.rice_bowl),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: fatsController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Gorduras (g)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.water_drop),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty ||
+                  timeController.text.isEmpty ||
+                  dateController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Preencha todos os campos obrigatórios'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              final date = DateFormat('dd/MM/yyyy').parse(dateController.text);
+
+              await _firestore
+                  .collection('users')
+                  .doc(widget.userId)
+                  .collection('meals')
+                  .add({
+                'mealName': nameController.text,
+                'mealType': selectedMealType,
+                'date': Timestamp.fromDate(date),
+                'time': timeController.text,
+                'calories': int.tryParse(caloriesController.text) ?? 0,
+                'protein': double.tryParse(proteinController.text) ?? 0,
+                'carbs': double.tryParse(carbsController.text) ?? 0,
+                'fats': double.tryParse(fatsController.text) ?? 0,
+                'eaten': false,
+                'timestamp': Timestamp.now(),
+              });
+
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Refeição adicionada com sucesso!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
     );
-    if (picked != null) {
-      final formattedHour = picked.hour.toString().padLeft(2, '0');
-      final formattedMinute = picked.minute.toString().padLeft(2, '0');
-      setState(() {
-        _timeController.text = '$formattedHour:$formattedMinute';
-      });
-    }
   }
 
-  void _addIngredient() {
-    if (_ingredientController.text.isNotEmpty) {
-      setState(() {
-        _ingredients.add(_ingredientController.text);
-        _ingredientController.clear();
-      });
-    }
-  }
+  Future<void> _copyMealToNextDays(Map<String, dynamic> meal, String mealId) async {
+    final daysController = TextEditingController(text: '1');
 
-  String? _validateNumber(String? value, String field) {
-    if (value == null || value.isEmpty) {
-      return 'Campo obrigatório';
-    }
-    try {
-      final number = double.parse(value);
-      if (number < 0) {
-        return '$field não pode ser negativo';
-      }
-    } catch (e) {
-      return 'Digite um número válido';
-    }
-    return null;
-  }
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Copiar Refeição'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Copiar esta refeição para os próximos dias:'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: daysController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Número de dias',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final days = int.tryParse(daysController.text) ?? 0;
+              if (days > 0) {
+                final originalDate = (meal['date'] as Timestamp).toDate();
+                
+                for (int i = 1; i <= days; i++) {
+                  final newDate = originalDate.add(Duration(days: i));
+                  await _firestore
+                      .collection('users')
+                      .doc(widget.userId)
+                      .collection('meals')
+                      .add({
+                    ...meal,
+                    'date': Timestamp.fromDate(newDate),
+                    'eaten': false,
+                    'timestamp': Timestamp.now(),
+                  });
+                }
 
-  Future<void> _saveMeal() async {
-    if (_formKey.currentState!.validate()) {
-      try {
-        final mealData = {
-          'date': DateFormat('yyyy-MM-dd').format(_selectedDate),
-          'mealType': _mealTypeController.text,
-          'mealName': _mealNameController.text,
-          'time': _timeController.text,
-          'calories': int.parse(_caloriesController.text),
-          'protein': double.parse(_proteinController.text),
-          'carbs': double.parse(_carbsController.text),
-          'fats': double.parse(_fatsController.text),
-          'ingredients': _ingredients,
-          'createdAt': FieldValue.serverTimestamp(),
-          'searchKeywords': _generateSearchKeywords(_mealNameController.text),
-        };
-
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(widget.userId)
-            .collection('meals')
-            .add(mealData);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Refeição adicionada com sucesso!')),
-          );
-          Navigator.pop(context);
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro ao adicionar refeição: $e')),
-          );
-        }
-      }
-    }
-  }
-
-  List<String> _generateSearchKeywords(String text) {
-    // Gera palavras-chave para pesquisa
-    final keywords = text.toLowerCase().split(' ');
-    final result = <String>[];
-    
-    for (var keyword in keywords) {
-      for (var i = 1; i <= keyword.length; i++) {
-        result.add(keyword.substring(0, i));
-      }
-    }
-    
-    return result;
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Refeição copiada para $days dias'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+            child: const Text('Copiar'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Adicionar Refeição'),
+        title: const Text('Gerenciar Refeições'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _saveMeal,
+            icon: const Icon(Icons.calendar_today),
+            onPressed: () async {
+              final date = await showDatePicker(
+                context: context,
+                initialDate: _selectedDate,
+                firstDate: DateTime(2020),
+                lastDate: DateTime(2025),
+                locale: const Locale('pt', 'BR'),
+              );
+              if (date != null) {
+                setState(() {
+                  _selectedDate = date;
+                });
+              }
+            },
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ListTile(
-                title: Text(
-                  'Data: ${DateFormat('dd/MM/yyyy').format(_selectedDate)}',
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Theme.of(context).primaryColor.withOpacity(0.1),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed: () {
+                    setState(() {
+                      _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+                    });
+                  },
                 ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.calendar_today),
-                  onPressed: () => _selectDate(context),
+                Column(
+                  children: [
+                    Text(
+                      DateFormat('dd/MM/yyyy').format(_selectedDate),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      DateFormat('EEEE', 'pt_BR').format(_selectedDate),
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed: () {
+                    setState(() {
+                      _selectedDate = _selectedDate.add(const Duration(days: 1));
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('users')
+                  .doc(widget.userId)
+                  .collection('meals')
+                  .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(
+                    DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day),
+                  ))
+                  .where('date', isLessThan: Timestamp.fromDate(
+                    DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day + 1),
+                  ))
+                  .orderBy('date')
+                  .orderBy('time')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(child: Text('Erro: ${snapshot.error}'));
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final meals = snapshot.data?.docs ?? [];
+
+                if (meals.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.no_meals_outlined,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Nenhuma refeição programada para\n${DateFormat('dd/MM/yyyy').format(_selectedDate)}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: meals.length,
+                  padding: const EdgeInsets.all(16),
+                  itemBuilder: (context, index) {
+                    final mealDoc = meals[index];
+                    final meal = mealDoc.data() as Map<String, dynamic>;
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      child: ListTile(
+                        title: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                meal['time'],
+                                style: TextStyle(
+                                  color: Theme.of(context).primaryColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                meal['mealName'],
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(meal['mealType']),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Calorias: ${meal['calories']} kcal | '
+'P: ${meal['protein']}g | '
+                              'C: ${meal['carbs']}g | '
+                              'G: ${meal['fats']}g',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                        trailing: PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert),
+                          onSelected: (value) async {
+                            switch (value) {
+                              case 'edit':
+                                // Implementar edição
+                                break;
+                              case 'copy':
+                                await _copyMealToNextDays(meal, mealDoc.id);
+                                break;
+                              case 'delete':
+                                await showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Confirmar Exclusão'),
+                                    content: const Text(
+                                      'Tem certeza que deseja excluir esta refeição?'
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('Cancelar'),
+                                      ),
+                                      FilledButton(
+                                        onPressed: () async {
+                                          await _firestore
+                                              .collection('users')
+                                              .doc(widget.userId)
+                                              .collection('meals')
+                                              .doc(mealDoc.id)
+                                              .delete();
+                                          Navigator.pop(context);
+                                        },
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                        ),
+                                        child: const Text('Excluir'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                break;
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit),
+                                  SizedBox(width: 8),
+                                  Text('Editar'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'copy',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.copy),
+                                  SizedBox(width: 8),
+                                  Text('Copiar para próximos dias'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete, color: Colors.red),
+                                  SizedBox(width: 8),
+                                  Text('Excluir', style: TextStyle(color: Colors.red)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addMeal,
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  void _showEditMealDialog(String mealId, Map<String, dynamic> currentMeal) async {
+    final nameController = TextEditingController(text: currentMeal['mealName']);
+    final caloriesController = TextEditingController(text: currentMeal['calories'].toString());
+    final proteinController = TextEditingController(text: currentMeal['protein'].toString());
+    final carbsController = TextEditingController(text: currentMeal['carbs'].toString());
+    final fatsController = TextEditingController(text: currentMeal['fats'].toString());
+    final timeController = TextEditingController(text: currentMeal['time']);
+    final dateController = TextEditingController(
+      text: DateFormat('dd/MM/yyyy').format((currentMeal['date'] as Timestamp).toDate()),
+    );
+    String selectedMealType = currentMeal['mealType'];
+
+    final mealTypes = [
+      'Café da Manhã',
+      'Lanche da Manhã',
+      'Almoço',
+      'Lanche da Tarde',
+      'Jantar',
+      'Ceia',
+      'Pré-Treino',
+      'Pós-Treino',
+    ];
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Editar Refeição'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nome da Refeição',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.restaurant_menu),
                 ),
               ),
-              // Dropdown para tipo de refeição
+              const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _mealTypeController.text.isEmpty ? null : _mealTypeController.text,
+                value: selectedMealType,
                 decoration: const InputDecoration(
                   labelText: 'Tipo de Refeição',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.category),
                 ),
-                items: _mealTypes.map((String type) {
-                  return DropdownMenuItem<String>(
+                items: mealTypes.map((type) {
+                  return DropdownMenuItem(
                     value: type,
                     child: Text(type),
                   );
                 }).toList(),
-                onChanged: (String? newValue) {
-                  if (newValue != null) {
-                    _mealTypeController.text = newValue;
+                onChanged: (value) {
+                  if (value != null) {
+                    selectedMealType = value;
                   }
                 },
-                validator: (value) => value == null ? 'Selecione um tipo de refeição' : null,
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _mealNameController,
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: dateController,
+                      readOnly: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Data',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.calendar_today),
+                      ),
+                      onTap: () async {
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate: (currentMeal['date'] as Timestamp).toDate(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2025),
+                          locale: const Locale('pt', 'BR'),
+                        );
+                        if (date != null) {
+                          dateController.text = DateFormat('dd/MM/yyyy').format(date);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextField(
+                      controller: timeController,
+                      readOnly: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Horário',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.access_time),
+                      ),
+                      onTap: () async {
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay(
+                            hour: int.parse(timeController.text.split(':')[0]),
+                            minute: int.parse(timeController.text.split(':')[1]),
+                          ),
+                        );
+                        if (time != null) {
+                          timeController.text = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: caloriesController,
+                keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  labelText: 'Nome da Refeição',
-                  hintText: 'Ex: Ovos mexidos',
+                  labelText: 'Calorias (kcal)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.local_fire_department),
                 ),
-                validator: (value) => value?.isEmpty ?? true ? 'Obrigatório' : null,
-                textCapitalization: TextCapitalization.sentences,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _timeController,
-                decoration: InputDecoration(
-                  labelText: 'Horário',
-                  hintText: 'Ex: 08:00',
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.access_time),
-                    onPressed: () => _selectTime(context),
-                  ),
-                ),
-                validator: (value) => value?.isEmpty ?? true ? 'Obrigatório' : null,
-                readOnly: true,
               ),
               const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
-                    child: TextFormField(
-                      controller: _caloriesController,
-                      decoration: const InputDecoration(
-                        labelText: 'Calorias',
-                        hintText: 'kcal',
-                      ),
+                    child: TextField(
+                      controller: proteinController,
                       keyboardType: TextInputType.number,
-                      validator: (value) => _validateNumber(value, 'Calorias'),
+                      decoration: const InputDecoration(
+                        labelText: 'Proteínas (g)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.egg),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: TextFormField(
-                      controller: _proteinController,
-                      decoration: const InputDecoration(
-                        labelText: 'Proteína',
-                        hintText: 'g',
-                      ),
+                    child: TextField(
+                      controller: carbsController,
                       keyboardType: TextInputType.number,
-                      validator: (value) => _validateNumber(value, 'Proteína'),
+                      decoration: const InputDecoration(
+                        labelText: 'Carboidratos (g)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.rice_bowl),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: fatsController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Gorduras (g)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.water_drop),
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _carbsController,
-                      decoration: const InputDecoration(
-                        labelText: 'Carboidratos',
-                        hintText: 'g',
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: (value) => _validateNumber(value, 'Carboidratos'),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _fatsController,
-                      decoration: const InputDecoration(
-                        labelText: 'Gorduras',
-                        hintText: 'g',
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: (value) => _validateNumber(value, 'Gorduras'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _ingredientController,
-                      decoration: const InputDecoration(
-                        labelText: 'Adicionar Ingrediente',
-                        hintText: 'Ex: 2 ovos',
-                      ),
-                      textCapitalization: TextCapitalization.sentences,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.add),
-                    onPressed: _addIngredient,
-                  ),
-                ],
-              ),
-              if (_ingredients.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text(
-                  'Ingredientes:',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ..._ingredients.map((ingredient) => ListTile(
-                  title: Text(ingredient),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.remove_circle),
-                    onPressed: () {
-                      setState(() {
-                        _ingredients.remove(ingredient);
-                      });
-                    },
-                  ),
-                )),
-              ],
             ],
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty ||
+                  timeController.text.isEmpty ||
+                  dateController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Preencha todos os campos obrigatórios'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              final date = DateFormat('dd/MM/yyyy').parse(dateController.text);
+
+              await _firestore
+                  .collection('users')
+                  .doc(widget.userId)
+                  .collection('meals')
+                  .doc(mealId)
+                  .update({
+                'mealName': nameController.text,
+                'mealType': selectedMealType,
+                'date': Timestamp.fromDate(date),
+                'time': timeController.text,
+                'calories': int.tryParse(caloriesController.text) ?? 0,
+                'protein': double.tryParse(proteinController.text) ?? 0,
+                'carbs': double.tryParse(carbsController.text) ?? 0,
+                'fats': double.tryParse(fatsController.text) ?? 0,
+              });
+
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Refeição atualizada com sucesso!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'package:fitbudi_1/meals_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -160,7 +161,7 @@ class MyApp extends StatelessWidget {
             );
 
           case '/meals':
-            return MaterialPageRoute(builder: (_) => const MealsPage());
+            return MaterialPageRoute(builder: (_) => const MealPage());
 
           case '/videos':
             return MaterialPageRoute(builder: (_) => const VideosPage());

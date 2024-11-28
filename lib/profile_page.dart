@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -10,19 +11,32 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
+class _WeightHistory {
+  final DateTime date;
+  final double weight;
+
+  _WeightHistory({required this.date, required this.weight});
+}
+
 class _ProfilePageState extends State<ProfilePage> {
+  // Instâncias do Firebase
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  // Variáveis de estado do usuário
   User? _user;
   String _name = '';
   String _email = '';
   double? _weight;
   double? _height;
-  String? _gender; // 'M' ou 'F'
+  String? _gender;
   DateTime? _birthDate;
   bool _isLoading = true;
 
+  // Lista para armazenar histórico de peso
+  List<_WeightHistory> _weightHistory = [];
+
+  // Controllers para formulários
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _weightController = TextEditingController();
   final TextEditingController _heightController = TextEditingController();
@@ -34,33 +48,39 @@ class _ProfilePageState extends State<ProfilePage> {
     _fetchUserData();
   }
 
+  // Método para buscar dados do usuário
   Future<void> _fetchUserData() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
+      // Busca usuário atual
       _user = _auth.currentUser;
       if (_user != null) {
+        // Busca nome e email
         _name = _user!.displayName ?? 'Usuário';
         _email = _user!.email ?? 'Sem e-mail';
 
-        // Obter informações do Firestore
+        // Busca dados adicionais no Firestore
         final doc = await _firestore.collection('users').doc(_user!.uid).get();
         if (doc.exists) {
           final data = doc.data();
-          _weight = data?['weight']?.toDouble();
-          _height = data?['height']?.toDouble();
-          _gender = data?['gender'];
-          _birthDate = data?['birthDate'] != null
-              ? (data!['birthDate'] as Timestamp).toDate()
-              : null;
+          setState(() {
+            _weight = data?['weight']?.toDouble();
+            _height = data?['height']?.toDouble();
+            _gender = data?['gender'];
+            _birthDate = data?['birthDate'] != null
+                ? (data!['birthDate'] as Timestamp).toDate()
+                : null;
+          });
+
+          // Busca histórico de peso
+          await _fetchWeightHistory();
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao carregar informações: $e')),
-      );
+      _showErrorSnackBar('Erro ao carregar informações: $e');
     }
 
     setState(() {
@@ -68,14 +88,40 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
+  // Método para buscar histórico de peso
+  Future<void> _fetchWeightHistory() async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('users')
+          .doc(_user!.uid)
+          .collection('weightHistory')
+          .orderBy('date')
+          .get();
+
+      setState(() {
+        _weightHistory = querySnapshot.docs.map((doc) {
+          return _WeightHistory(
+            date: (doc['date'] as Timestamp).toDate(),
+            weight: doc['weight'].toDouble(),
+          );
+        }).toList();
+      });
+    } catch (e) {
+      _showErrorSnackBar('Erro ao carregar histórico de peso: $e');
+    }
+  }
+
+  // Método para salvar informações do usuário
   Future<void> _saveUserInfo() async {
     if (_formKey.currentState?.validate() ?? false) {
       try {
+        // Parse dos dados do formulário
         final weight = double.parse(_weightController.text);
         final height = double.parse(_heightController.text);
         final gender = _gender!;
         final birthDate = DateFormat('dd/MM/yyyy').parse(_birthDateController.text);
 
+        // Salva no Firestore
         await _firestore.collection('users').doc(_user!.uid).set({
           'weight': weight,
           'height': height,
@@ -83,24 +129,100 @@ class _ProfilePageState extends State<ProfilePage> {
           'birthDate': birthDate,
         }, SetOptions(merge: true));
 
+        // Adiciona primeira entrada de peso ao histórico
+        await _firestore
+          .collection('users')
+          .doc(_user!.uid)
+          .collection('weightHistory')
+          .add({
+            'date': DateTime.now(),
+            'weight': weight,
+          });
+
+        // Atualiza estado local
         setState(() {
           _weight = weight;
           _height = height;
           _gender = gender;
           _birthDate = birthDate;
+          _weightHistory.add(_WeightHistory(
+            date: DateTime.now(), 
+            weight: weight
+          ));
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Dados salvos com sucesso!')),
-        );
+        _showSuccessSnackBar('Dados salvos com sucesso!');
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao salvar os dados: $e')),
-        );
+        _showErrorSnackBar('Erro ao salvar os dados: $e');
       }
     }
   }
 
+  // Método para adicionar nova entrada de peso
+  Future<void> _addWeightEntry() async {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Adicionar Peso'),
+          content: TextField(
+            controller: _weightController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Peso (kg)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                try {
+                  final newWeight = double.parse(_weightController.text);
+                  
+                  // Salva no histórico de peso
+                  await _firestore
+                    .collection('users')
+                    .doc(_user!.uid)
+                    .collection('weightHistory')
+                    .add({
+                      'date': DateTime.now(),
+                      'weight': newWeight,
+                    });
+
+                  // Atualiza peso atual
+                  await _firestore
+                    .collection('users')
+                    .doc(_user!.uid)
+                    .update({'weight': newWeight});
+
+                  // Atualiza estado local
+                  setState(() {
+                    _weight = newWeight;
+                    _weightHistory.add(_WeightHistory(
+                      date: DateTime.now(), 
+                      weight: newWeight
+                    ));
+                  });
+
+                  Navigator.of(context).pop();
+                  _showSuccessSnackBar('Peso atualizado com sucesso!');
+                } catch (e) {
+                  _showErrorSnackBar('Erro ao salvar peso: $e');
+                }
+              },
+              child: const Text('Salvar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Métodos auxiliares de cálculo
   String? _calculateAge() {
     if (_birthDate == null) return null;
     final today = DateTime.now();
@@ -119,6 +241,108 @@ class _ProfilePageState extends State<ProfilePage> {
     return bmi.toStringAsFixed(1);
   }
 
+  // Métodos de exibição de mensagens
+void _showErrorSnackBar(String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      backgroundColor: Colors.red,
+    ),
+  );
+}
+void _showSuccessSnackBar(String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      backgroundColor: Colors.green,
+    ),
+  );
+}
+  // Método para construir gráfico de peso
+Widget _buildWeightChart() {
+  if (_weightHistory.isEmpty) {
+    return const Center(child: Text('Sem dados de peso'));
+  }
+
+  return LineChart(
+    LineChartData(
+      gridData: FlGridData(
+        show: true,
+        drawVerticalLine: true,
+        horizontalInterval: 1,
+        verticalInterval: 1,
+        getDrawingHorizontalLine: (value) {
+          return FlLine(
+            color: Colors.grey.withOpacity(0.2),
+            strokeWidth: 1,
+          );
+        },
+        getDrawingVerticalLine: (value) {
+          return FlLine(
+            color: Colors.grey.withOpacity(0.2),
+            strokeWidth: 1,
+          );
+        },
+      ),
+      titlesData: FlTitlesData(
+        show: true,
+        bottomTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 30,
+          interval: 1,
+          getTextStyles: (context, value) => const TextStyle(fontSize: 10),
+          getTitles: (value) {
+            final index = value.toInt();
+            if (index < 0 || index >= _weightHistory.length) {
+              return '';
+            }
+            return DateFormat('dd/MM').format(_weightHistory[index].date);
+          },
+        ),
+        leftTitles: SideTitles(
+          showTitles: true,
+          interval: 1,
+          getTextStyles: (context, value) => const TextStyle(fontSize: 10),
+          getTitles: (value) => value.toStringAsFixed(1),
+          reservedSize: 42,
+        ),
+        rightTitles: SideTitles(showTitles: false),
+        topTitles: SideTitles(showTitles: false),
+      ),
+      borderData: FlBorderData(
+        show: true,
+        border: Border.all(color: const Color(0xff37434d)),
+      ),
+      minX: 0,
+      maxX: (_weightHistory.length - 1).toDouble(),
+      minY: _weightHistory.map((e) => e.weight).reduce((a, b) => a < b ? a : b) - 5,
+      maxY: _weightHistory.map((e) => e.weight).reduce((a, b) => a > b ? a : b) + 5,
+      lineBarsData: [
+        LineChartBarData(
+          spots: _weightHistory.asMap().entries.map((entry) {
+            return FlSpot(
+              entry.key.toDouble(),
+              entry.value.weight,
+            );
+          }).toList(),
+          isCurved: true,
+          colors: [Colors.blue.shade300, Colors.blue.shade700],
+          barWidth: 3,
+          isStrokeCapRound: true,
+          dotData: FlDotData(show: true),
+          belowBarData: BarAreaData(
+            show: true,
+            colors: [
+              Colors.blue.shade200.withOpacity(0.4),
+              Colors.blue.shade700.withOpacity(0.1),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -127,13 +351,13 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: SingleChildScrollView(
+          : SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Informações do usuário
+                    // Informações básicas do usuário
                     Text(
                       'Nome: $_name',
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -145,11 +369,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Verifica se informações básicas estão definidas
-                    if (_weight == null ||
-                        _height == null ||
-                        _gender == null ||
-                        _birthDate == null)
+                    // Exibe informações do usuário ou formulário para preenchimento
+                    if (_weight == null || _height == null || _gender == null || _birthDate == null)
                       Form(
                         key: _formKey,
                         child: Column(
@@ -261,13 +482,13 @@ class _ProfilePageState extends State<ProfilePage> {
                             ElevatedButton(
                               onPressed: _saveUserInfo,
                               child: const Text('Salvar'),
-                            ),
+                           ),
                           ],
                         ),
                       )
                     else
                       // Exibe informações do usuário
-                      Column(
+Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
@@ -293,6 +514,21 @@ class _ProfilePageState extends State<ProfilePage> {
                           Text(
                             'IMC: ${_calculateBMI()}',
                             style: const TextStyle(fontSize: 16),
+                          ),
+                          const SizedBox(height: 24),
+                          const Text(
+                            'Histórico de Peso:',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            height: 300,
+                            child: _buildWeightChart(),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _addWeightEntry,
+                            child: const Text('Adicionar Peso'),
                           ),
                         ],
                       ),
