@@ -19,8 +19,17 @@ class _UserSearchPageState extends State<UserSearchPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF1E1E1E),
       appBar: AppBar(
-        title: const Text('Buscar Usuário'),
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text(
+          'Buscar Usuário',
+          style: TextStyle(color: Colors.white),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Column(
         children: [
@@ -28,12 +37,14 @@ class _UserSearchPageState extends State<UserSearchPage> {
             padding: const EdgeInsets.all(16.0),
             child: TextField(
               controller: _searchController,
+              style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Digite o email do usuário',
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: const TextStyle(color: Colors.grey),
+                prefixIcon: const Icon(Icons.search, color: Colors.grey),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear),
+                        icon: const Icon(Icons.clear, color: Colors.grey),
                         onPressed: () {
                           _searchController.clear();
                           setState(() {
@@ -42,13 +53,24 @@ class _UserSearchPageState extends State<UserSearchPage> {
                         },
                       )
                     : null,
+                filled: true,
+                fillColor: const Color(0xFF2C2C2C),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.white24),
                 ),
               ),
               onChanged: (value) {
                 setState(() {
-                  _searchQuery = value;
+                  _searchQuery = value.toLowerCase();
                 });
               },
             ),
@@ -57,13 +79,19 @@ class _UserSearchPageState extends State<UserSearchPage> {
             child: StreamBuilder<QuerySnapshot>(
               stream: _firestore
                   .collection('users')
-                  .where('email', isGreaterThanOrEqualTo: _searchQuery)
-                  .where('email', isLessThanOrEqualTo: _searchQuery + '\uf8ff')
+                  .where('email_lowercase', isGreaterThanOrEqualTo: _searchQuery)
+                  .where('email_lowercase', isLessThanOrEqualTo: _searchQuery + '\uf8ff')
+                  .where('deleted', isNotEqualTo: 1)
                   .limit(20)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return Center(child: Text('Erro: ${snapshot.error}'));
+                  return Center(
+                    child: Text(
+                      'Erro: ${snapshot.error}',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  );
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -91,7 +119,7 @@ class _UserSearchPageState extends State<UserSearchPage> {
                           'Digite um email para buscar',
                           style: TextStyle(
                             fontSize: 16,
-                            color: Colors.grey[600],
+                            color: Colors.grey[400],
                           ),
                         ),
                       ],
@@ -114,7 +142,7 @@ class _UserSearchPageState extends State<UserSearchPage> {
                           'Nenhum usuário encontrado',
                           style: TextStyle(
                             fontSize: 16,
-                            color: Colors.grey[600],
+                            color: Colors.grey[400],
                           ),
                         ),
                       ],
@@ -135,6 +163,7 @@ class _UserSearchPageState extends State<UserSearchPage> {
                         horizontal: 8,
                         vertical: 4,
                       ),
+                      color: const Color(0xFF2C2C2C),
                       child: ListTile(
                         leading: CircleAvatar(
                           backgroundColor: Theme.of(context).primaryColor,
@@ -143,8 +172,14 @@ class _UserSearchPageState extends State<UserSearchPage> {
                             style: const TextStyle(color: Colors.white),
                           ),
                         ),
-                        title: Text(name),
-                        subtitle: Text(email),
+                        title: Text(
+                          name,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        subtitle: Text(
+                          email,
+                          style: const TextStyle(color: Colors.grey),
+                        ),
                         onTap: () {
                           Navigator.push(
                             context,

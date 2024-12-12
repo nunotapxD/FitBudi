@@ -3,7 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'AdminMealPage.dart';
-import 'user_calendar_widget.dart';
+import 'calendar_page.dart';
+import 'chat/chat_page.dart';
 import 'widgets/youtube_player_dialog.dart';
 
 class AdminDashboardPage extends StatefulWidget {
@@ -195,6 +196,38 @@ Widget _buildUserDashboard() {
             icon: Icons.monitor_weight,
             color: Colors.blue,
             onTap: () => setState(() => currentSection = 'weight'),
+          ),
+          _buildNavigationCard(
+            title: 'Agenda',
+            icon: Icons.calendar_today,
+            color: Colors.green,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CalendarPage(
+                    userId: selectedUserId!,
+                    isAdmin: true,
+                  ),
+                ),
+              );
+            },
+          ),
+          _buildNavigationCard(
+            title: 'Chat',
+            icon: Icons.chat,
+            color: Colors.indigo,
+            onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ChatPage(
+                      otherUserId: selectedUserId!,
+                      otherUserName: selectedUserName,
+                    ),
+                  ),
+              );
+            },
           ),
           _buildNavigationCard(
             title: 'Voltar',
